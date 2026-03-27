@@ -3,7 +3,7 @@ import React, { useState, useMemo, useCallback, useRef } from 'react'
 import {
   FileText, File, Check, AlertCircle, Link, Unlink,
   X, Trash2, ArrowUpDown, LayoutGrid, List,
-  ArrowDownCircle, ArrowUpCircle, Search, Upload, Download, Eye, Loader2
+  ArrowDownCircle, ArrowUpCircle, Search, Upload, Download, Eye, Loader2, Wand2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useDocumentStore } from '@/stores/documentStore'
@@ -13,6 +13,7 @@ import { useVendorAliasStore } from '@/stores/vendorAliasStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { formatCurrency, formatDate } from '@/lib/formatters'
+import { matchDocument, isAutoMatch } from '@/lib/document-matcher'
 import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import { Transaction, DocumentRecord } from '@/lib/types'
@@ -165,11 +166,81 @@ export default function DocumentsPage() {
         uploaded++
       }
       if (uploaded > 0) toast.success(`Uploaded ${uploaded} document${uploaded > 1 ? 's' : ''}`)
+
+      // Auto-match newly uploaded documents
+      if (uploaded > 0) {
+        // Small delay to let state update
+        setTimeout(() => {
+          const currentDocs = useDocumentStore.getState().documents
+          const currentTxns = useTransactionStore.getState().transactions
+          const currentContacts = useContactStore.getState().contacts
+          let autoMatched = 0
+          for (const doc of currentDocs.filter(d => d.matchedTransactionIds.length === 0)) {
+            const candidates = matchDocument(doc, currentTxns, currentContacts)
+            if (isAutoMatch(candidates)) {
+              const best = candidates[0]
+              useDocumentStore.getState().updateDocument(doc.id, {
+                matchedTransactionIds: [best.transactionId],
+                matchConfidence: best.score,
+                matchMethod: 'auto'
+              })
+              const txn = currentTxns.find(t => t.id === best.transactionId)
+              if (txn) {
+                useTransactionStore.getState().updateTransaction(best.transactionId, {
+                  documentIds: [...txn.documentIds, doc.id],
+                  status: 'reconciled'
+                })
+              }
+              if (doc.extractedVendor && txn?.contactId) {
+                useVendorAliasStore.getState().addAlias(doc.extractedVendor, txn.contactId)
+              }
+              autoMatched++
+            }
+          }
+          if (autoMatched > 0) toast.success(`Auto-matched ${autoMatched} document${autoMatched > 1 ? 's' : ''}`)
+        }, 100)
+      }
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
+
+  const handleAutoMatch = useCallback(() => {
+    const unmatchedDocs = documents.filter(d => d.matchedTransactionIds.length === 0)
+    if (unmatchedDocs.length === 0) {
+      toast('No unmatched documents to process')
+      return
+    }
+    let matched = 0
+    for (const doc of unmatchedDocs) {
+      const candidates = matchDocument(doc, transactions, contacts)
+      if (isAutoMatch(candidates)) {
+        const best = candidates[0]
+        updateDocument(doc.id, {
+          matchedTransactionIds: [best.transactionId],
+          matchConfidence: best.score,
+          matchMethod: 'auto'
+        })
+        const txn = transactions.find(t => t.id === best.transactionId)
+        if (txn) {
+          updateTransaction(best.transactionId, {
+            documentIds: [...txn.documentIds, doc.id],
+            status: 'reconciled'
+          })
+        }
+        if (doc.extractedVendor && txn?.contactId) {
+          addAlias(doc.extractedVendor, txn.contactId)
+        }
+        matched++
+      }
+    }
+    if (matched > 0) {
+      toast.success(`Auto-matched ${matched} document${matched > 1 ? 's' : ''} (${unmatchedDocs.length - matched} remaining)`)
+    } else {
+      toast('No confident matches found. Try manual matching.')
+    }
+  }, [documents, transactions, contacts, updateDocument, updateTransaction, addAlias])
 
   const handleManualMatch = (docId: string) => {
     setMatchingDocId(docId)
@@ -264,7 +335,15 @@ export default function DocumentsPage() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Documents</h2>
           <p className="text-sm text-gray-500 mt-1">Manage invoices and receipts</p>
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleAutoMatch}
+            className="btn-secondary btn-md flex items-center gap-2"
+            title="Auto-match unmatched documents to transactions"
+          >
+            <Wand2 size={16} />
+            Auto-Match
+          </button>
           <input
             ref={fileInputRef}
             type="file"

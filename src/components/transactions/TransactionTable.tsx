@@ -4,14 +4,17 @@ import {
   useReactTable, getCoreRowModel, getSortedRowModel,
   flexRender, createColumnHelper, SortingState
 } from '@tanstack/react-table'
-import { ArrowUpDown, Paperclip, ChevronDown, ChevronUp, MessageSquare, Lightbulb } from 'lucide-react'
-import { Transaction } from '@/lib/types'
+import { ArrowUpDown, Paperclip, ChevronDown, ChevronUp, MessageSquare, Lightbulb, Plus, Search, X, Check, FileText } from 'lucide-react'
+import { Transaction, DocumentRecord } from '@/lib/types'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useContactStore } from '@/stores/contactStore'
 import { useCategoryStore } from '@/stores/categoryStore'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useVendorAliasStore } from '@/stores/vendorAliasStore'
 import { formatCurrency, formatDate, cleanDescription } from '@/lib/formatters'
+import { supabase } from '@/lib/supabase'
+import Modal from '@/components/ui/Modal'
 import InlineSelect from '@/components/ui/InlineSelect'
 import MonthYearPicker from '@/components/ui/MonthYearPicker'
 import CreateRuleDialog from './CreateRuleDialog'
@@ -283,6 +286,7 @@ function ExpandedRow({ transaction, editingNotes, setEditingNotes, updateTransac
   setEditingNotes: (val: { id: string; text: string } | null) => void
   updateTransaction: (id: string, updates: Partial<Transaction>) => void
 }) {
+  const [showDocPicker, setShowDocPicker] = useState(false)
   const isEditingNotes = editingNotes?.id === transaction.id
   return (
     <div className="grid grid-cols-3 gap-6">
@@ -312,8 +316,13 @@ function ExpandedRow({ transaction, editingNotes, setEditingNotes, updateTransac
         )}
       </div>
       <div>
-        <label className="text-xs font-medium text-gray-500 mb-1 block">Documents</label>
-        <DocumentLinks documentIds={transaction.documentIds} />
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs font-medium text-gray-500 block">Documents</label>
+          <button onClick={() => setShowDocPicker(true)} className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
+            <Plus size={12} />Match
+          </button>
+        </div>
+        <DocumentLinks documentIds={transaction.documentIds} transactionId={transaction.id} updateTransaction={updateTransaction} />
         {transaction.splitParts && transaction.splitParts.length > 0 && (
           <div className="mt-3">
             <label className="text-xs font-medium text-gray-500 mb-1 block">Split ({transaction.splitParts.length} parts)</label>
@@ -322,26 +331,162 @@ function ExpandedRow({ transaction, editingNotes, setEditingNotes, updateTransac
             ))}
           </div>
         )}
+        <DocumentPickerDialog
+          isOpen={showDocPicker}
+          onClose={() => setShowDocPicker(false)}
+          transaction={transaction}
+          updateTransaction={updateTransaction}
+        />
       </div>
     </div>
   )
 }
 
-function DocumentLinks({ documentIds }: { documentIds: string[] }) {
+function DocumentLinks({ documentIds, transactionId, updateTransaction }: { documentIds: string[]; transactionId: string; updateTransaction: (id: string, updates: Partial<Transaction>) => void }) {
   const getDocument = useDocumentStore((s) => s.getDocument)
+  const updateDocument = useDocumentStore((s) => s.updateDocument)
+
+  const handleUnlink = (docId: string) => {
+    const doc = getDocument(docId)
+    if (doc) {
+      updateDocument(docId, { matchedTransactionIds: doc.matchedTransactionIds.filter(id => id !== transactionId) })
+    }
+    const txn = useTransactionStore.getState().transactions.find(t => t.id === transactionId)
+    if (txn) {
+      const newDocIds = txn.documentIds.filter(id => id !== docId)
+      updateTransaction(transactionId, { documentIds: newDocIds, status: newDocIds.length === 0 ? 'unreconciled' : txn.status })
+    }
+  }
+
+  const getDocUrl = (storedPath: string): string | null => {
+    if (!storedPath || storedPath.includes('/')) return null
+    const { data } = supabase.storage.from('documents').getPublicUrl(storedPath)
+    return data?.publicUrl || null
+  }
+
   if (documentIds.length === 0) return <p className="text-sm text-gray-400 italic">No documents attached</p>
   return (
     <div className="space-y-1">
       {documentIds.map((docId) => {
         const doc = getDocument(docId)
         const displayName = doc ? (() => { const path = doc.storedPath || doc.originalFilename; const parts = path.replace(/\\/g, '/').split('/'); return parts[parts.length - 1] || doc.originalFilename })() : docId
+        const url = doc ? getDocUrl(doc.storedPath) : null
         return (
-          <div key={docId} className="flex items-center gap-2 text-sm text-primary-600">
-            <Paperclip size={12} />
-            <span className="text-xs truncate">{displayName}</span>
+          <div key={docId} className="flex items-center gap-2 text-sm group">
+            <Paperclip size={12} className="text-primary-600 flex-shrink-0" />
+            {url ? (
+              <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs truncate text-primary-600 hover:underline">{displayName}</a>
+            ) : (
+              <span className="text-xs truncate text-primary-600">{displayName}</span>
+            )}
+            <button onClick={() => handleUnlink(docId)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 hover:text-red-500 transition-all flex-shrink-0" title="Unlink">
+              <X size={10} />
+            </button>
           </div>
         )
       })}
     </div>
+  )
+}
+
+function DocumentPickerDialog({ isOpen, onClose, transaction, updateTransaction }: {
+  isOpen: boolean; onClose: () => void; transaction: Transaction
+  updateTransaction: (id: string, updates: Partial<Transaction>) => void
+}) {
+  const documents = useDocumentStore((s) => s.documents)
+  const updateDocument = useDocumentStore((s) => s.updateDocument)
+  const addAlias = useVendorAliasStore((s) => s.addAlias)
+  const [search, setSearch] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+
+  const availableDocs = useMemo(() => {
+    const alreadyLinked = new Set(transaction.documentIds)
+    let result = documents.filter(d => !alreadyLinked.has(d.id))
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(d =>
+        d.originalFilename.toLowerCase().includes(q) ||
+        (d.extractedVendor && d.extractedVendor.toLowerCase().includes(q)) ||
+        (d.extractedInvoiceNumber && d.extractedInvoiceNumber.toLowerCase().includes(q)) ||
+        d.storedPath.toLowerCase().includes(q)
+      )
+    }
+    return result.slice(0, 50)
+  }, [documents, transaction.documentIds, search])
+
+  const handleProceed = () => {
+    if (selectedIds.length === 0) return
+    const newDocIds = [...transaction.documentIds, ...selectedIds]
+    updateTransaction(transaction.id, { documentIds: newDocIds, status: 'reconciled' })
+    for (const docId of selectedIds) {
+      const doc = documents.find(d => d.id === docId)
+      if (doc) {
+        updateDocument(docId, {
+          matchedTransactionIds: [...doc.matchedTransactionIds, transaction.id],
+          matchConfidence: 1,
+          matchMethod: 'manual'
+        })
+        if (doc.extractedVendor && transaction.contactId) {
+          addAlias(doc.extractedVendor, transaction.contactId)
+        }
+      }
+    }
+    setSelectedIds([])
+    setSearch('')
+    onClose()
+  }
+
+  const toggleDoc = (id: string) => setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+
+  if (!isOpen) return null
+
+  return (
+    <Modal isOpen={isOpen} onClose={() => { onClose(); setSelectedIds([]); setSearch('') }} title="Match Documents" size="lg">
+      <div className="space-y-4">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" placeholder="Search documents by name, vendor, invoice #..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" autoFocus />
+          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={14} /></button>}
+        </div>
+        <div className="max-h-80 overflow-y-auto space-y-1">
+          {availableDocs.length === 0 ? (
+            <p className="text-center text-gray-400 py-4 text-sm">No documents found</p>
+          ) : availableDocs.map((doc) => {
+            const isSelected = selectedIds.includes(doc.id)
+            const displayName = (() => { const parts = (doc.storedPath || doc.originalFilename).replace(/\\/g, '/').split('/'); return parts[parts.length - 1] || doc.originalFilename })()
+            return (
+              <button key={doc.id} onClick={() => toggleDoc(doc.id)}
+                className={`w-full text-left p-3 rounded-lg transition-colors border ${isSelected ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-600' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-200 dark:hover:border-gray-600'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-primary-600 border-primary-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                    {isSelected && <Check size={10} className="text-white" />}
+                  </div>
+                  <FileText size={16} className="text-gray-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{displayName}</p>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
+                      {doc.extractedVendor && <span>{doc.extractedVendor}</span>}
+                      {doc.extractedAmount !== null && <span>{formatCurrency(doc.extractedAmount)}</span>}
+                      {doc.extractedDate && <span>{formatDate(doc.extractedDate)}</span>}
+                      <span className={`px-1.5 py-0.5 rounded ${doc.matchedTransactionIds.length > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
+                        {doc.matchedTransactionIds.length > 0 ? 'Matched' : 'Unmatched'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        {selectedIds.length > 0 && (
+          <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+            <span className="text-sm text-gray-600 dark:text-gray-400">{selectedIds.length} document{selectedIds.length > 1 ? 's' : ''} selected</span>
+            <button onClick={handleProceed} className="btn-primary btn-sm flex items-center gap-1.5"><Check size={14} />Match</button>
+          </div>
+        )}
+      </div>
+    </Modal>
   )
 }
