@@ -13,7 +13,7 @@ import { useVendorAliasStore } from '@/stores/vendorAliasStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { formatCurrency, formatDate } from '@/lib/formatters'
-import { matchDocument, isAutoMatch } from '@/lib/document-matcher'
+import { matchDocument, isAutoMatch, updateContactFromEntities } from '@/lib/document-matcher'
 import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import { Transaction, DocumentRecord } from '@/lib/types'
@@ -150,6 +150,7 @@ export default function DocumentsPage() {
           vendor?: string | null; invoiceNumber?: string | null
           billingPeriod?: { month: number; year: number } | null
           direction?: 'incoming' | 'outgoing'
+          entities?: { businessNames: string[]; personNames: string[]; addresses: string[]; emails: string[]; phones: string[]; vatTaxIds: string[] }
         } = {}
 
         if (ext === 'pdf') {
@@ -175,6 +176,7 @@ export default function DocumentsPage() {
           extractedVendor: extractedData.vendor || null,
           extractedInvoiceNumber: extractedData.invoiceNumber || null,
           extractedBillingPeriod: extractedData.billingPeriod || null,
+          extractedEntities: extractedData.entities || undefined,
           direction: extractedData.direction || 'incoming',
           matchedTransactionIds: [],
           matchConfidence: 0,
@@ -225,6 +227,10 @@ export default function DocumentsPage() {
                   }
                 }
               }
+              // Update contact with extracted entities from the document
+              if (txn?.contactId) {
+                updateContactFromEntities(doc, txn.contactId, currentContacts, useContactStore.getState().updateContact)
+              }
               autoMatched++
             }
           }
@@ -264,6 +270,10 @@ export default function DocumentsPage() {
           addAlias(doc.extractedVendor, txn.contactId)
           learnTransactionPattern(txn, txn.contactId)
         }
+        // Update contact with extracted entities (address, email, phone, etc.)
+        if (txn?.contactId) {
+          updateContactFromEntities(doc, txn.contactId, contacts, updateContact)
+        }
         matched++
       }
     }
@@ -272,7 +282,7 @@ export default function DocumentsPage() {
     } else {
       toast('No confident matches found. Try manual matching.')
     }
-  }, [documents, transactions, contacts, vendorAliases, updateDocument, updateTransaction, addAlias])
+  }, [documents, transactions, contacts, vendorAliases, updateDocument, updateTransaction, addAlias, updateContact])
 
   const handleManualMatch = (docId: string) => {
     setMatchingDocId(docId)
@@ -305,6 +315,10 @@ export default function DocumentsPage() {
         const txn = transactions.find(t => t.id === txnId)
         if (txn?.contactId) learnTransactionPattern(txn, txn.contactId)
       }
+    }
+    // Update contact with extracted entities (address, email, phone, etc.)
+    if (firstWithContact?.contactId) {
+      updateContactFromEntities(doc, firstWithContact.contactId, contacts, updateContact)
     }
     toast.success(`Matched ${newIds.length} transaction${newIds.length > 1 ? 's' : ''} to document`)
     setShowMatchDialog(false)

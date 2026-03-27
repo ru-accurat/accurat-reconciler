@@ -71,6 +71,16 @@ export interface CategorizationRule {
   updatedAt: string
 }
 
+// Extracted entities from PDF scanning
+export interface ExtractedEntities {
+  businessNames: string[]
+  personNames: string[]
+  addresses: string[]
+  emails: string[]
+  phones: string[]
+  vatTaxIds: string[]
+}
+
 // Document Record
 export interface DocumentRecord {
   id: string
@@ -82,6 +92,7 @@ export interface DocumentRecord {
   extractedVendor: string | null
   extractedInvoiceNumber: string | null
   extractedBillingPeriod: { month: number; year: number } | null
+  extractedEntities?: ExtractedEntities
   direction: 'incoming' | 'outgoing'
   matchedTransactionIds: string[]
   matchConfidence: number

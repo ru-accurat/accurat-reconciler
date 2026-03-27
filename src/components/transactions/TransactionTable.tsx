@@ -13,6 +13,7 @@ import { useDocumentStore } from '@/stores/documentStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useVendorAliasStore } from '@/stores/vendorAliasStore'
 import { formatCurrency, formatDate, cleanDescription } from '@/lib/formatters'
+import { updateContactFromEntities } from '@/lib/document-matcher'
 import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import InlineSelect from '@/components/ui/InlineSelect'
@@ -442,6 +443,10 @@ function DocumentPickerDialog({ isOpen, onClose, transaction, updateTransaction 
               }
             }
           }
+        }
+        // Update contact with extracted entities (address, email, phone, etc.)
+        if (transaction.contactId) {
+          updateContactFromEntities(doc, transaction.contactId, contacts, updateContact)
         }
       }
     }
