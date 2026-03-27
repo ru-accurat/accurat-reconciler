@@ -1,4 +1,4 @@
-import { Transaction, DocumentRecord, Contact } from '@/lib/types'
+import { Transaction, DocumentRecord, Contact, VendorAlias } from '@/lib/types'
 
 export interface MatchCandidate {
   transactionId: string
@@ -18,22 +18,27 @@ const MAX_DATE_PROXIMITY_DAYS = 30
  * Match a document against transactions using multi-factor scoring.
  * - Amount match (0.5): exact match within $0.01
  * - Vendor fuzzy match (0.3): simple string inclusion/similarity against description + contact name + patterns
+ *   Now also uses vendor aliases learned from manual matches.
  * - Date proximity (0.2): linear decay over 30 days
  */
 export function matchDocument(
   doc: DocumentRecord,
   transactions: Transaction[],
-  contacts: Contact[]
+  contacts: Contact[],
+  vendorAliases?: VendorAlias[]
 ): MatchCandidate[] {
   // Build a contact map
   const contactMap = new Map<string, Contact>()
   for (const c of contacts) contactMap.set(c.id, c)
 
+  // Resolve vendor alias: if we've previously learned that this vendor maps to a contact, use it
+  const aliasContactId = resolveVendorAlias(doc.extractedVendor, vendorAliases)
+
   const candidates: MatchCandidate[] = []
 
   for (const txn of transactions) {
     const amountScore = calculateAmountScore(doc.extractedAmount, txn.amount)
-    const vendorSimilarity = calculateVendorSimilarity(doc.extractedVendor, txn, contactMap)
+    const vendorSimilarity = calculateVendorSimilarity(doc.extractedVendor, txn, contactMap, aliasContactId)
     const dateResult = calculateDateProximity(doc.extractedDate, txn.date)
 
     const score = amountScore * WEIGHT_AMOUNT + vendorSimilarity * WEIGHT_VENDOR + dateResult.score * WEIGHT_DATE
@@ -53,6 +58,14 @@ export function matchDocument(
   return candidates
 }
 
+function resolveVendorAlias(extractedVendor: string | null, aliases?: VendorAlias[]): string | null {
+  if (!extractedVendor || !aliases || aliases.length === 0) return null
+  const normalized = extractedVendor.toLowerCase().trim().replace(/\s+/g, ' ')
+  if (!normalized) return null
+  const alias = aliases.find(a => a.extractedVendor === normalized)
+  return alias?.contactId ?? null
+}
+
 function calculateAmountScore(extractedAmount: number | null, transactionAmount: number): number {
   if (extractedAmount === null) return 0
   const diff = Math.abs(Math.abs(extractedAmount) - Math.abs(transactionAmount))
@@ -62,11 +75,16 @@ function calculateAmountScore(extractedAmount: number | null, transactionAmount:
 function calculateVendorSimilarity(
   extractedVendor: string | null,
   txn: Transaction,
-  contactMap: Map<string, Contact>
+  contactMap: Map<string, Contact>,
+  aliasContactId: string | null
 ): number {
   if (!extractedVendor) return 0
   const vendor = extractedVendor.toLowerCase().trim()
   if (!vendor) return 0
+
+  // Learned alias match: if we previously learned that this vendor maps to a specific contact,
+  // and this transaction belongs to that contact, it's a very strong signal
+  if (aliasContactId && txn.contactId === aliasContactId) return 0.95
 
   const contact = txn.contactId ? contactMap.get(txn.contactId) : null
   const desc = txn.rawDescription.toLowerCase()

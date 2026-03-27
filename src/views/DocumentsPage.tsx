@@ -30,7 +30,9 @@ export default function DocumentsPage() {
   const transactions = useTransactionStore((s) => s.transactions)
   const updateTransaction = useTransactionStore((s) => s.updateTransaction)
   const contacts = useContactStore((s) => s.contacts)
+  const updateContact = useContactStore((s) => s.updateContact)
   const addAlias = useVendorAliasStore((s) => s.addAlias)
+  const vendorAliases = useVendorAliasStore((s) => s.aliases)
   const settings = useSettingsStore((s) => s.settings)
   const globalSearch = useUIStore((s) => s.filters.search)
 
@@ -47,6 +49,22 @@ export default function DocumentsPage() {
   const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([])
 
   const isDocMatched = (doc: DocumentRecord): boolean => doc.matchedTransactionIds.length > 0
+
+  // Learn: extract a meaningful pattern from a transaction description and add it to the contact's patterns
+  const learnTransactionPattern = useCallback((txn: Transaction, contactId: string) => {
+    const contact = contacts.find(c => c.id === contactId)
+    if (!contact) return
+    // Extract a clean pattern from the raw description (first 3-4 significant tokens)
+    const tokens = txn.rawDescription.toUpperCase().split(/[\s\-_.,#*]+/).filter(t => t.length > 2)
+    if (tokens.length === 0) return
+    const pattern = tokens.slice(0, 4).join(' ')
+    // Don't add if a similar pattern already exists
+    const existing = contact.transactionPatterns.map(p => p.toUpperCase())
+    if (existing.some(p => p.includes(pattern) || pattern.includes(p))) return
+    // Also skip if the description is too generic (just numbers/dates)
+    if (/^\d[\d\s/\-]*$/.test(pattern)) return
+    updateContact(contactId, { transactionPatterns: [...contact.transactionPatterns, pattern] })
+  }, [contacts, updateContact])
 
   const filteredDocuments = useMemo(() => {
     let result = [...documents]
@@ -174,9 +192,10 @@ export default function DocumentsPage() {
           const currentDocs = useDocumentStore.getState().documents
           const currentTxns = useTransactionStore.getState().transactions
           const currentContacts = useContactStore.getState().contacts
+          const currentAliases = useVendorAliasStore.getState().aliases
           let autoMatched = 0
           for (const doc of currentDocs.filter(d => d.matchedTransactionIds.length === 0)) {
-            const candidates = matchDocument(doc, currentTxns, currentContacts)
+            const candidates = matchDocument(doc, currentTxns, currentContacts, currentAliases)
             if (isAutoMatch(candidates)) {
               const best = candidates[0]
               useDocumentStore.getState().updateDocument(doc.id, {
@@ -193,6 +212,18 @@ export default function DocumentsPage() {
               }
               if (doc.extractedVendor && txn?.contactId) {
                 useVendorAliasStore.getState().addAlias(doc.extractedVendor, txn.contactId)
+                // Learn transaction pattern for the contact
+                const contact = currentContacts.find(c => c.id === txn.contactId)
+                if (contact) {
+                  const tokens = txn.rawDescription.toUpperCase().split(/[\s\-_.,#*]+/).filter(t => t.length > 2)
+                  if (tokens.length > 0) {
+                    const pattern = tokens.slice(0, 4).join(' ')
+                    const existing = contact.transactionPatterns.map(p => p.toUpperCase())
+                    if (!existing.some(p => p.includes(pattern) || pattern.includes(p)) && !/^\d[\d\s/\-]*$/.test(pattern)) {
+                      useContactStore.getState().updateContact(txn.contactId, { transactionPatterns: [...contact.transactionPatterns, pattern] })
+                    }
+                  }
+                }
               }
               autoMatched++
             }
@@ -214,7 +245,7 @@ export default function DocumentsPage() {
     }
     let matched = 0
     for (const doc of unmatchedDocs) {
-      const candidates = matchDocument(doc, transactions, contacts)
+      const candidates = matchDocument(doc, transactions, contacts, vendorAliases)
       if (isAutoMatch(candidates)) {
         const best = candidates[0]
         updateDocument(doc.id, {
@@ -231,6 +262,7 @@ export default function DocumentsPage() {
         }
         if (doc.extractedVendor && txn?.contactId) {
           addAlias(doc.extractedVendor, txn.contactId)
+          learnTransactionPattern(txn, txn.contactId)
         }
         matched++
       }
@@ -240,7 +272,7 @@ export default function DocumentsPage() {
     } else {
       toast('No confident matches found. Try manual matching.')
     }
-  }, [documents, transactions, contacts, updateDocument, updateTransaction, addAlias])
+  }, [documents, transactions, contacts, vendorAliases, updateDocument, updateTransaction, addAlias])
 
   const handleManualMatch = (docId: string) => {
     setMatchingDocId(docId)
@@ -266,7 +298,14 @@ export default function DocumentsPage() {
       if (txn) updateTransaction(txnId, { documentIds: [...txn.documentIds, matchingDocId], status: 'reconciled' })
     }
     const firstWithContact = newIds.map((id) => transactions.find((t) => t.id === id)).find((t) => t?.contactId)
-    if (doc.extractedVendor && firstWithContact?.contactId) addAlias(doc.extractedVendor, firstWithContact.contactId)
+    if (doc.extractedVendor && firstWithContact?.contactId) {
+      addAlias(doc.extractedVendor, firstWithContact.contactId)
+      // Learn transaction patterns from all matched transactions for this contact
+      for (const txnId of newIds) {
+        const txn = transactions.find(t => t.id === txnId)
+        if (txn?.contactId) learnTransactionPattern(txn, txn.contactId)
+      }
+    }
     toast.success(`Matched ${newIds.length} transaction${newIds.length > 1 ? 's' : ''} to document`)
     setShowMatchDialog(false)
     setMatchingDocId(null)

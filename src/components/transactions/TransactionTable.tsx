@@ -396,6 +396,8 @@ function DocumentPickerDialog({ isOpen, onClose, transaction, updateTransaction 
   const documents = useDocumentStore((s) => s.documents)
   const updateDocument = useDocumentStore((s) => s.updateDocument)
   const addAlias = useVendorAliasStore((s) => s.addAlias)
+  const contacts = useContactStore((s) => s.contacts)
+  const updateContact = useContactStore((s) => s.updateContact)
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
@@ -428,6 +430,18 @@ function DocumentPickerDialog({ isOpen, onClose, transaction, updateTransaction 
         })
         if (doc.extractedVendor && transaction.contactId) {
           addAlias(doc.extractedVendor, transaction.contactId)
+          // Learn transaction pattern for the contact
+          const contact = contacts.find(c => c.id === transaction.contactId)
+          if (contact) {
+            const tokens = transaction.rawDescription.toUpperCase().split(/[\s\-_.,#*]+/).filter(t => t.length > 2)
+            if (tokens.length > 0) {
+              const pattern = tokens.slice(0, 4).join(' ')
+              const existing = contact.transactionPatterns.map(p => p.toUpperCase())
+              if (!existing.some(p => p.includes(pattern) || pattern.includes(p)) && !/^\d[\d\s/\-]*$/.test(pattern)) {
+                updateContact(transaction.contactId, { transactionPatterns: [...contact.transactionPatterns, pattern] })
+              }
+            }
+          }
         }
       }
     }
