@@ -1,17 +1,19 @@
 'use client'
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useRef } from 'react'
 import {
   FileText, File, Check, AlertCircle, Link, Unlink,
   X, Trash2, ArrowUpDown, LayoutGrid, List,
-  ArrowDownCircle, ArrowUpCircle, Search
+  ArrowDownCircle, ArrowUpCircle, Search, Upload, Download, Eye, Loader2
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useContactStore } from '@/stores/contactStore'
 import { useVendorAliasStore } from '@/stores/vendorAliasStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { formatCurrency, formatDate } from '@/lib/formatters'
+import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import { Transaction, DocumentRecord } from '@/lib/types'
 
@@ -21,14 +23,18 @@ type ViewMode = 'list' | 'grid'
 
 export default function DocumentsPage() {
   const documents = useDocumentStore((s) => s.documents)
+  const addDocument = useDocumentStore((s) => s.addDocument)
   const updateDocument = useDocumentStore((s) => s.updateDocument)
   const deleteDocument = useDocumentStore((s) => s.deleteDocument)
   const transactions = useTransactionStore((s) => s.transactions)
   const updateTransaction = useTransactionStore((s) => s.updateTransaction)
   const contacts = useContactStore((s) => s.contacts)
   const addAlias = useVendorAliasStore((s) => s.addAlias)
+  const settings = useSettingsStore((s) => s.settings)
   const globalSearch = useUIStore((s) => s.filters.search)
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
   const [filterTab, setFilterTab] = useState<FilterTab>('all')
   const [showMatchDialog, setShowMatchDialog] = useState(false)
   const [matchingDocId, setMatchingDocId] = useState<string | null>(null)
@@ -93,6 +99,78 @@ export default function DocumentsPage() {
     return parts[parts.length - 1] || originalFilename
   }
 
+  const getDocumentUrl = useCallback((storedPath: string): string | null => {
+    if (!storedPath) return null
+    const { data } = supabase.storage.from('documents').getPublicUrl(storedPath)
+    return data?.publicUrl || null
+  }, [])
+
+  const handleUploadFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setUploading(true)
+    let uploaded = 0
+    try {
+      for (const file of Array.from(files)) {
+        const ext = file.name.split('.').pop()?.toLowerCase() || ''
+        const timestamp = Date.now()
+        const storagePath = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('documents')
+          .upload(storagePath, file, { contentType: file.type, upsert: false })
+
+        if (uploadError) {
+          toast.error(`Failed to upload ${file.name}: ${uploadError.message}`)
+          continue
+        }
+
+        // Extract PDF data if applicable
+        let extractedData: {
+          text?: string; date?: string | null; amount?: number | null
+          vendor?: string | null; invoiceNumber?: string | null
+          billingPeriod?: { month: number; year: number } | null
+          direction?: 'incoming' | 'outgoing'
+        } = {}
+
+        if (ext === 'pdf') {
+          try {
+            const formData = new FormData()
+            formData.append('file', file)
+            if (settings.customAmountLabels?.length > 0) {
+              formData.append('customAmountLabels', JSON.stringify(settings.customAmountLabels))
+            }
+            const res = await fetch('/api/pdf', { method: 'POST', body: formData })
+            if (res.ok) extractedData = await res.json()
+          } catch {
+            // PDF extraction failed — still add the document
+          }
+        }
+
+        addDocument({
+          originalFilename: file.name,
+          storedPath: storagePath,
+          extractedText: extractedData.text || '',
+          extractedDate: extractedData.date || null,
+          extractedAmount: extractedData.amount ?? null,
+          extractedVendor: extractedData.vendor || null,
+          extractedInvoiceNumber: extractedData.invoiceNumber || null,
+          extractedBillingPeriod: extractedData.billingPeriod || null,
+          direction: extractedData.direction || 'incoming',
+          matchedTransactionIds: [],
+          matchConfidence: 0,
+          matchMethod: 'auto',
+          scannedAt: new Date().toISOString()
+        })
+        uploaded++
+      }
+      if (uploaded > 0) toast.success(`Uploaded ${uploaded} document${uploaded > 1 ? 's' : ''}`)
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   const handleManualMatch = (docId: string) => {
     setMatchingDocId(docId)
     setMatchSearch('')
@@ -149,7 +227,7 @@ export default function DocumentsPage() {
     toast.success('Document unlinked from all transactions')
   }
 
-  const handleDeleteDocument = (docId: string) => {
+  const handleDeleteDocument = async (docId: string) => {
     const doc = documents.find((d) => d.id === docId)
     if (!doc) return
     for (const txnId of doc.matchedTransactionIds) {
@@ -158,6 +236,10 @@ export default function DocumentsPage() {
         const newDocIds = txn.documentIds.filter((id) => id !== docId)
         updateTransaction(txn.id, { documentIds: newDocIds, status: newDocIds.length === 0 ? 'unreconciled' : txn.status })
       }
+    }
+    // Delete from Supabase Storage if it's a storage path (not a legacy local path)
+    if (doc.storedPath && !doc.storedPath.includes('/') && !doc.storedPath.startsWith('\\')) {
+      await supabase.storage.from('documents').remove([doc.storedPath])
     }
     deleteDocument(docId)
     toast.success('Document removed')
@@ -181,6 +263,24 @@ export default function DocumentsPage() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Documents</h2>
           <p className="text-sm text-gray-500 mt-1">Manage invoices and receipts</p>
+        </div>
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            multiple
+            className="hidden"
+            onChange={(e) => handleUploadFiles(e.target.files)}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="btn-primary btn-md flex items-center gap-2"
+          >
+            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+            {uploading ? 'Uploading...' : 'Upload Documents'}
+          </button>
         </div>
       </div>
 
@@ -229,7 +329,13 @@ export default function DocumentsPage() {
         <div className="card p-12 text-center text-gray-400">
           <FileText size={48} className="mx-auto mb-3 opacity-30" />
           {documents.length === 0 ? (
-            <><p className="font-medium">No documents yet</p><p className="text-sm mt-1">Documents will appear here when data is imported</p></>
+            <>
+              <p className="font-medium">No documents yet</p>
+              <p className="text-sm mt-1 mb-3">Upload invoices and receipts to get started</p>
+              <button onClick={() => fileInputRef.current?.click()} className="btn-primary btn-md inline-flex items-center gap-2">
+                <Upload size={16} />Upload Documents
+              </button>
+            </>
           ) : (
             <p className="font-medium">No {filterTab === 'matched' ? 'matched' : 'unmatched'} documents</p>
           )}
@@ -242,8 +348,20 @@ export default function DocumentsPage() {
             const displayFilename = getDisplayFilename(doc.storedPath, doc.originalFilename)
             return (
               <div key={doc.id} className="card overflow-hidden hover:shadow-md transition-shadow">
-                <div className="w-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center" style={{ height: 120 }}>
+                <div className="w-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center relative group" style={{ height: 120 }}>
                   <File size={48} className="text-gray-300" />
+                  {getDocumentUrl(doc.storedPath) && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <a href={getDocumentUrl(doc.storedPath)!} target="_blank" rel="noopener noreferrer"
+                        className="p-2 bg-white rounded-full shadow hover:bg-gray-100 transition-colors" title="View">
+                        <Eye size={16} className="text-gray-700" />
+                      </a>
+                      <a href={getDocumentUrl(doc.storedPath)!} download={doc.originalFilename}
+                        className="p-2 bg-white rounded-full shadow hover:bg-gray-100 transition-colors" title="Download">
+                        <Download size={16} className="text-gray-700" />
+                      </a>
+                    </div>
+                  )}
                 </div>
                 <div className="p-3">
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate mb-1" title={displayFilename}>{displayFilename}</p>
@@ -285,7 +403,12 @@ export default function DocumentsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-gray-900 dark:text-gray-100 truncate">{displayFilename}</span>
+                      {getDocumentUrl(doc.storedPath) ? (
+                        <a href={getDocumentUrl(doc.storedPath)!} target="_blank" rel="noopener noreferrer"
+                          className="font-medium text-primary-600 dark:text-primary-400 hover:underline truncate">{displayFilename}</a>
+                      ) : (
+                        <span className="font-medium text-gray-900 dark:text-gray-100 truncate">{displayFilename}</span>
+                      )}
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${doc.direction === 'incoming' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'}`}>
                         {doc.direction === 'incoming' ? <ArrowDownCircle size={12} /> : <ArrowUpCircle size={12} />}{doc.direction}
                       </span>
