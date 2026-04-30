@@ -16,6 +16,7 @@ import { formatCurrency, formatDate } from '@/lib/formatters'
 import { matchDocument, isAutoMatch, updateContactFromEntities } from '@/lib/document-matcher'
 import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
+import DocumentThumbnail from '@/components/documents/DocumentThumbnail'
 import { Transaction, DocumentRecord } from '@/lib/types'
 
 type FilterTab = 'all' | 'matched' | 'unmatched'
@@ -480,8 +481,12 @@ export default function DocumentsPage() {
             const displayFilename = getDisplayFilename(doc.storedPath, doc.originalFilename)
             return (
               <div key={doc.id} className="card overflow-hidden hover:shadow-md transition-shadow">
-                <div className="w-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center relative group" style={{ height: 120 }}>
-                  <File size={48} className="text-gray-300" />
+                <div className="w-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center relative group overflow-hidden" style={{ height: 160 }}>
+                  <DocumentThumbnail
+                    document={doc}
+                    onThumbnailReady={(id, path) => updateDocument(id, { thumbnailPath: path })}
+                    className="w-full h-full object-cover"
+                  />
                   {getDocumentUrl(doc.storedPath) && (
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       <a href={getDocumentUrl(doc.storedPath)!} target="_blank" rel="noopener noreferrer"

@@ -86,6 +86,10 @@ export interface DocumentRecord {
   id: string
   originalFilename: string
   storedPath: string
+  // Storage path of a generated thumbnail (WebP), in the same `documents` bucket.
+  // Populated lazily for PDFs the first time the doc is viewed in the grid.
+  // Image documents skip thumbnail generation — the source file is the thumbnail.
+  thumbnailPath?: string | null
   extractedText: string
   extractedDate: string | null
   extractedAmount: number | null

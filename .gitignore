@@ -25,3 +25,6 @@ npm-debug.log*
 .DS_Store
 *.tgz
 tsconfig.tsbuildinfo
+
+# pdfjs worker copied by postinstall — version-pinned via package-lock.json
+public/pdf.worker.min.mjs
