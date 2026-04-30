@@ -1,4 +1,10 @@
 import { Transaction, DocumentRecord, Contact, VendorAlias } from '@/lib/types'
+import {
+  InvoiceTemplate,
+  computeSignature,
+  findMatchingTemplates,
+  TEMPLATE_MATCH_THRESHOLD,
+} from '@/lib/invoice-template'
 
 export interface MatchCandidate {
   transactionId: string
@@ -6,6 +12,8 @@ export interface MatchCandidate {
   amountMatch: boolean
   vendorSimilarity: number
   dateProximityDays: number
+  templateMatchScore?: number
+  templateContactId?: string | null
 }
 
 // Scoring weights
@@ -25,7 +33,8 @@ export function matchDocument(
   doc: DocumentRecord,
   transactions: Transaction[],
   contacts: Contact[],
-  vendorAliases?: VendorAlias[]
+  vendorAliases?: VendorAlias[],
+  templates?: InvoiceTemplate[]
 ): MatchCandidate[] {
   // Build a contact map
   const contactMap = new Map<string, Contact>()
@@ -37,6 +46,18 @@ export function matchDocument(
   // Collect all entity names from the document for broader matching
   const entityNames = collectEntityNames(doc)
 
+  // Find best template (if any) — drives a contact-scoped score boost.
+  let bestTemplateScore = 0
+  let bestTemplateContactId: string | null = null
+  if (templates && templates.length > 0) {
+    const sig = computeSignature(doc)
+    const hits = findMatchingTemplates(sig, templates)
+    if (hits.length > 0) {
+      bestTemplateScore = hits[0].score
+      bestTemplateContactId = hits[0].template.contactId
+    }
+  }
+
   const candidates: MatchCandidate[] = []
 
   for (const txn of transactions) {
@@ -44,7 +65,14 @@ export function matchDocument(
     const vendorSimilarity = calculateVendorSimilarity(doc.extractedVendor, txn, contactMap, aliasContactId, entityNames)
     const dateResult = calculateDateProximity(doc.extractedDate, txn.date)
 
-    const score = amountScore * WEIGHT_AMOUNT + vendorSimilarity * WEIGHT_VENDOR + dateResult.score * WEIGHT_DATE
+    let score = amountScore * WEIGHT_AMOUNT + vendorSimilarity * WEIGHT_VENDOR + dateResult.score * WEIGHT_DATE
+
+    // Template boost: only applied to transactions with the learned contactId.
+    let txnTemplateScore = 0
+    if (bestTemplateContactId && txn.contactId === bestTemplateContactId && bestTemplateScore >= TEMPLATE_MATCH_THRESHOLD) {
+      txnTemplateScore = bestTemplateScore
+      score = Math.min(1.0, score + 0.2 * bestTemplateScore)
+    }
 
     if (score > 0) {
       candidates.push({
@@ -52,7 +80,9 @@ export function matchDocument(
         score: Math.round(score * 1000) / 1000,
         amountMatch: amountScore === 1,
         vendorSimilarity: Math.round(vendorSimilarity * 1000) / 1000,
-        dateProximityDays: dateResult.days
+        dateProximityDays: dateResult.days,
+        templateMatchScore: txnTemplateScore > 0 ? Math.round(txnTemplateScore * 1000) / 1000 : undefined,
+        templateContactId: txnTemplateScore > 0 ? bestTemplateContactId : null,
       })
     }
   }
@@ -197,7 +227,10 @@ export function isAutoMatch(candidates: MatchCandidate[]): boolean {
   if (candidates.length === 0) return false
   const best = candidates[0]
   if (best.score <= 0.7) return false
-  if (candidates.length > 1 && candidates[1].score > 0.3) return false
+  // High template confidence relaxes the runner-up gap requirement, since the
+  // template tells us which contact a doc belongs to even when ambiguous txns exist.
+  const runnerUpThreshold = (best.templateMatchScore ?? 0) >= 0.8 ? 0.5 : 0.3
+  if (candidates.length > 1 && candidates[1].score > runnerUpThreshold) return false
   return true
 }
 

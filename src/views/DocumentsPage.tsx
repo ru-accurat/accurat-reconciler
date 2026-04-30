@@ -10,10 +10,12 @@ import { useDocumentStore } from '@/stores/documentStore'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useContactStore } from '@/stores/contactStore'
 import { useVendorAliasStore } from '@/stores/vendorAliasStore'
+import { useInvoiceTemplateStore } from '@/stores/invoiceTemplateStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { formatCurrency, formatDate } from '@/lib/formatters'
 import { matchDocument, isAutoMatch, updateContactFromEntities } from '@/lib/document-matcher'
+import { computeSignature } from '@/lib/invoice-template'
 import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import DocumentThumbnail from '@/components/documents/DocumentThumbnail'
@@ -34,6 +36,7 @@ export default function DocumentsPage() {
   const updateContact = useContactStore((s) => s.updateContact)
   const addAlias = useVendorAliasStore((s) => s.addAlias)
   const vendorAliases = useVendorAliasStore((s) => s.aliases)
+  const templates = useInvoiceTemplateStore((s) => s.templates)
   const settings = useSettingsStore((s) => s.settings)
   const globalSearch = useUIStore((s) => s.filters.search)
 
@@ -196,9 +199,10 @@ export default function DocumentsPage() {
           const currentTxns = useTransactionStore.getState().transactions
           const currentContacts = useContactStore.getState().contacts
           const currentAliases = useVendorAliasStore.getState().aliases
+          const currentTemplates = useInvoiceTemplateStore.getState().templates
           let autoMatched = 0
           for (const doc of currentDocs.filter(d => d.matchedTransactionIds.length === 0)) {
-            const candidates = matchDocument(doc, currentTxns, currentContacts, currentAliases)
+            const candidates = matchDocument(doc, currentTxns, currentContacts, currentAliases, currentTemplates)
             if (isAutoMatch(candidates)) {
               const best = candidates[0]
               useDocumentStore.getState().updateDocument(doc.id, {
@@ -252,7 +256,7 @@ export default function DocumentsPage() {
     }
     let matched = 0
     for (const doc of unmatchedDocs) {
-      const candidates = matchDocument(doc, transactions, contacts, vendorAliases)
+      const candidates = matchDocument(doc, transactions, contacts, vendorAliases, templates)
       if (isAutoMatch(candidates)) {
         const best = candidates[0]
         updateDocument(doc.id, {
@@ -283,7 +287,7 @@ export default function DocumentsPage() {
     } else {
       toast('No confident matches found. Try manual matching.')
     }
-  }, [documents, transactions, contacts, vendorAliases, updateDocument, updateTransaction, addAlias, updateContact])
+  }, [documents, transactions, contacts, vendorAliases, templates, updateDocument, updateTransaction, addAlias, updateContact])
 
   const handleManualMatch = (docId: string) => {
     setMatchingDocId(docId)
@@ -320,6 +324,15 @@ export default function DocumentsPage() {
     // Update contact with extracted entities (address, email, phone, etc.)
     if (firstWithContact?.contactId) {
       updateContactFromEntities(doc, firstWithContact.contactId, contacts, updateContact)
+    }
+    // Learn an invoice template so future matching docs get a contact-scoped boost.
+    // Bypass the 2s auto-save debounce — same pattern that bit thumbnails when the
+    // user closes the tab before the timer fires.
+    if (firstWithContact?.contactId) {
+      const tmplStore = useInvoiceTemplateStore.getState()
+      const sig = computeSignature(doc)
+      tmplStore.addTemplate(firstWithContact.contactId, sig, doc.id)
+      tmplStore.save().catch(() => { /* silent: non-critical learning hook */ })
     }
     toast.success(`Matched ${newIds.length} transaction${newIds.length > 1 ? 's' : ''} to document`)
     setShowMatchDialog(false)

@@ -8,6 +8,7 @@ import { useContactStore } from '@/stores/contactStore'
 import { useRuleStore } from '@/stores/ruleStore'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useVendorAliasStore } from '@/stores/vendorAliasStore'
+import { useInvoiceTemplateStore } from '@/stores/invoiceTemplateStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 
 import DashboardPage from '@/views/DashboardPage'
@@ -40,6 +41,7 @@ export default function AppShell() {
         useRuleStore.getState().load(),
         useDocumentStore.getState().load(),
         useVendorAliasStore.getState().load(),
+        useInvoiceTemplateStore.getState().load(),
         useSettingsStore.getState().load(),
       ])
       useSettingsStore.getState().applyTheme()
@@ -59,6 +61,7 @@ export default function AppShell() {
         useRuleStore.getState().save(),
         useDocumentStore.getState().save(),
         useVendorAliasStore.getState().save(),
+        useInvoiceTemplateStore.getState().save(),
         useSettingsStore.getState().save(),
       ])
     }, 2000)
@@ -73,6 +76,7 @@ export default function AppShell() {
       useRuleStore.subscribe(saveAll),
       useDocumentStore.subscribe(saveAll),
       useVendorAliasStore.subscribe(saveAll),
+      useInvoiceTemplateStore.subscribe(saveAll),
       useSettingsStore.subscribe(saveAll),
     ]
     return () => unsubs.forEach((u) => u())
