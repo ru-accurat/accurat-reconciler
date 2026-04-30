@@ -152,7 +152,10 @@ let skippedAmbiguous = 0
 let skippedNoContact = 0
 
 for (const doc of docs) {
-  if (doc.matchMethod !== 'manual' || !Array.isArray(doc.matchedTransactionIds) || doc.matchedTransactionIds.length === 0) continue
+  // Learn from any standing match (manual or auto). User's explicit intent:
+  // treat "still linked" as confirmation. Auto-matches the user hasn't
+  // unlinked are good signal.
+  if (!Array.isArray(doc.matchedTransactionIds) || doc.matchedTransactionIds.length === 0) continue
   if (existingByDocId.has(doc.id)) { skippedExisting++; continue }
 
   const contactIds = new Set()
@@ -187,7 +190,7 @@ for (const doc of docs) {
 
 console.log(`\n=== Summary ===`)
 console.log(`  total docs:          ${docs.length}`)
-console.log(`  manual-matched docs: ${docs.filter(d => d.matchMethod === 'manual' && d.matchedTransactionIds?.length > 0).length}`)
+console.log(`  matched docs (any method): ${docs.filter(d => d.matchedTransactionIds?.length > 0).length}`)
 console.log(`  existing templates:  ${existingTemplates.length}`)
 console.log(`  new templates:       ${newTemplates.length}`)
 console.log(`  skipped (existing):  ${skippedExisting}`)

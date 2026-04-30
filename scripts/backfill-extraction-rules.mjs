@@ -153,7 +153,9 @@ let rules = existingRules.slice()
 let ruleAdditions = 0
 
 for (const doc of docs) {
-  if (doc.matchMethod !== 'manual' || !Array.isArray(doc.matchedTransactionIds) || doc.matchedTransactionIds.length === 0) continue
+  // Learn from any standing match (manual or auto). Same intent as templates:
+  // a still-linked auto-match is implicitly confirmed.
+  if (!Array.isArray(doc.matchedTransactionIds) || doc.matchedTransactionIds.length === 0) continue
   // Use the first matched transaction with a contact — same convention as the UI.
   const txn = doc.matchedTransactionIds.map(id => txnById.get(id)).find(t => t?.contactId) || txnById.get(doc.matchedTransactionIds[0])
   if (!txn) continue
@@ -180,7 +182,7 @@ for (const r of tentative) {
 
 console.log(`\n=== Summary ===`)
 console.log(`  total docs:           ${docs.length}`)
-console.log(`  manual-matched docs:  ${docs.filter(d => d.matchMethod === 'manual' && d.matchedTransactionIds?.length > 0).length}`)
+console.log(`  matched docs (any method): ${docs.filter(d => d.matchedTransactionIds?.length > 0).length}`)
 console.log(`  existing rules:       ${existingRules.length}`)
 console.log(`  rule additions:       ${ruleAdditions}`)
 console.log(`  total rules now:      ${rules.length}`)

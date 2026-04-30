@@ -472,81 +472,30 @@ function extractBillingPeriod(text: string): { month: number; year: number } | n
   return null
 }
 
-// Recipient labels — invoice issued TO whoever follows. Multi-word phrases
-// can be followed by an optional colon or just whitespace (PDF layouts vary).
-// Single-word labels like "Customer" and "Client" require an explicit colon
-// to avoid matching section headers like "Customer Special Services".
-const RECIPIENT_LABEL_PHRASE_RE = /^(bill(?:ed)?\s+to|sold\s+to|ship(?:ped)?\s+to|issued\s+to)\b[:\s]*(.*)$/i
-const RECIPIENT_LABEL_WORD_RE = /^(customer|client)\s*:\s*(.*)$/i
-// Issuer labels — same rule: phrases lenient, single words require a colon.
-const ISSUER_LABEL_PHRASE_RE = /^(billed?\s+by|issued\s+by)\b[:\s]*(.*)$/i
-const ISSUER_LABEL_WORD_RE = /^(from|seller|provider)\s*:\s*(.*)$/i
-// Sub-labels that appear between the recipient label and the actual name and must be skipped.
-const SUBLABEL_LINE_RE = /^(attn|attention|c\/o|care\s+of)\b[:\s]*/i
-const SELF_HINT_RE = /\b(accurat|gabriele\s+rossi)\b/i
-
-function isSelfLine(line: string): boolean {
-  return SELF_HINT_RE.test(line) || isSelf(line.replace(/[,].*$/, '').trim())
-}
-
-// Take the value chunk that follows a label on the same line, stripping
-// any leading "Attn:" / "Attention:" sub-label.
-function stripSublabel(s: string): string {
-  return s.replace(SUBLABEL_LINE_RE, '').trim()
-}
-
-// Walk forward from `startIdx` (exclusive) through up to `maxLookahead`
-// non-empty lines, skipping sublabel lines, returning the first concrete
-// line of content (or null).
-function nextContentLine(lines: string[], startIdx: number, maxLookahead = 4): string | null {
-  for (let i = startIdx + 1; i < Math.min(lines.length, startIdx + 1 + maxLookahead); i++) {
-    const line = lines[i].trim()
-    if (!line) continue
-    if (SUBLABEL_LINE_RE.test(line)) {
-      // "Attn: <name>" — value may be on the same line after the sublabel
-      const after = stripSublabel(line)
-      if (after) return after
-      continue  // bare "Attn:" with value on the next line
-    }
-    return line
-  }
-  return null
-}
+// Outgoing invoices from Accurat all use the same template (currently a
+// Stripe-generated invoice). The Zelle payment instruction "Zelle to
+// gabriele.rossi@accurat.nyc" is unique to that template — incoming docs
+// addressed to gabriele.rossi@accurat.nyc may include the email itself,
+// but never the Zelle payment instruction. So the Zelle phrase is the
+// reliable outgoing marker; the bare email is not.
+//
+// This is a deliberate inversion of the previous label-based heuristic —
+// label parsing kept misclassifying utility bills (ConEd, T-Mobile, etc.)
+// as outgoing because they happen to mention "Accurat" in their address
+// blocks. The template-marker approach treats outgoing as the tightly
+// defined case and incoming as the catch-all, which matches reality:
+// outgoing invoices look identical to one another, every other doc varies.
+//
+// If the Accurat invoice template changes, update SELF_OUTGOING_MARKERS.
+const SELF_OUTGOING_MARKERS: RegExp[] = [
+  /\bzelle\s+to\s+gabriele\.rossi@accurat\.nyc\b/i,
+]
 
 function detectDirection(text: string): 'incoming' | 'outgoing' {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
-
-  // Phase 1: anchor on a recipient label. Whoever follows it (skipping
-  // sublabels) is who the invoice is billed TO. If that's us → incoming.
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(RECIPIENT_LABEL_PHRASE_RE) ?? lines[i].match(RECIPIENT_LABEL_WORD_RE)
-    if (!m) continue
-    let recipient = stripSublabel(m[2] ?? '')
-    if (!recipient) {
-      // Label was alone on the line; look ahead.
-      recipient = nextContentLine(lines, i) ?? ''
-    }
-    if (!recipient) continue
-    return isSelfLine(recipient) ? 'incoming' : 'outgoing'
+  if (!text) return 'incoming'
+  for (const marker of SELF_OUTGOING_MARKERS) {
+    if (marker.test(text)) return 'outgoing'
   }
-
-  // Phase 2: no recipient label found. Try issuer labels — if the issuer
-  // is us, this is outgoing.
-  for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(ISSUER_LABEL_PHRASE_RE) ?? lines[i].match(ISSUER_LABEL_WORD_RE)
-    if (!m) continue
-    let issuer = stripSublabel(m[2] ?? '')
-    if (!issuer) issuer = nextContentLine(lines, i) ?? ''
-    if (!issuer) continue
-    return isSelfLine(issuer) ? 'outgoing' : 'incoming'
-  }
-
-  // Phase 3: nothing labeled. Default to incoming. The previous "if Accurat
-  // appears anywhere → outgoing" heuristic was wrong for utility bills (ConEd,
-  // T-Mobile, etc.) — they put the customer's name and address at the top
-  // without any "Bill To:" label, so "Accurat appears" matches but the doc is
-  // actually addressed TO us. Bills/receipts received vastly outnumber
-  // unlabeled invoices we issue, so default-incoming is the safer fallback.
   return 'incoming'
 }
 
