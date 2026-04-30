@@ -31,5 +31,6 @@ INSERT INTO app_data (key, value) VALUES
   ('documents', '{"version": 1, "lastModified": null, "documents": []}'),
   ('vendorAliases', '{"version": 1, "lastModified": null, "aliases": []}'),
   ('invoiceTemplates', '{"version": 1, "lastModified": null, "templates": []}'),
+  ('vendorExtractionRules', '{"version": 1, "lastModified": null, "rules": []}'),
   ('settings', '{}')
 ON CONFLICT (key) DO NOTHING;

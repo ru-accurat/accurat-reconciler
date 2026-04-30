@@ -11,11 +11,13 @@ import { useTransactionStore } from '@/stores/transactionStore'
 import { useContactStore } from '@/stores/contactStore'
 import { useVendorAliasStore } from '@/stores/vendorAliasStore'
 import { useInvoiceTemplateStore } from '@/stores/invoiceTemplateStore'
+import { useVendorExtractionRuleStore } from '@/stores/vendorExtractionRuleStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { formatCurrency, formatDate } from '@/lib/formatters'
 import { matchDocument, isAutoMatch, updateContactFromEntities } from '@/lib/document-matcher'
 import { computeSignature } from '@/lib/invoice-template'
+import { inferRulesFromMatch } from '@/lib/extraction-feedback'
 import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import DocumentThumbnail from '@/components/documents/DocumentThumbnail'
@@ -159,6 +161,12 @@ export default function DocumentsPage() {
 
         if (ext === 'pdf') {
           try {
+            // First pass: extract with global custom-amount labels only.
+            // Vendor-specific labels are keyed on the extracted vendor — which
+            // we don't know yet — so a two-pass approach is unavoidable.
+            // Trade-off: ~2x extraction cost for docs whose vendor has learned
+            // rules. Cheaper than parsing the PDF client-side just to peek at
+            // the vendor first.
             const formData = new FormData()
             formData.append('file', file)
             if (settings.customAmountLabels?.length > 0) {
@@ -166,6 +174,34 @@ export default function DocumentsPage() {
             }
             const res = await fetch('/api/pdf', { method: 'POST', body: formData })
             if (res.ok) extractedData = await res.json()
+
+            // Second pass: if the extracted vendor has learned date/amount labels
+            // AND the first-pass result is suspicious (null/missing), re-extract
+            // with vendor-specific labels and prefer those.
+            const vendor = extractedData.vendor
+            if (vendor) {
+              const ruleStore = useVendorExtractionRuleStore.getState()
+              const dateLabels = ruleStore.getActiveRules(vendor, 'date')
+              const amountLabels = ruleStore.getActiveRules(vendor, 'amount')
+              const dateSuspicious = !extractedData.date
+              const amountSuspicious = extractedData.amount === null || extractedData.amount === undefined
+              const haveAny = dateLabels.length > 0 || amountLabels.length > 0
+              const worthRetrying = haveAny && (dateSuspicious || amountSuspicious)
+              if (worthRetrying) {
+                const fd2 = new FormData()
+                fd2.append('file', file)
+                const mergedAmountLabels = [...amountLabels, ...(settings.customAmountLabels ?? [])]
+                if (mergedAmountLabels.length > 0) fd2.append('customAmountLabels', JSON.stringify(mergedAmountLabels))
+                if (dateLabels.length > 0) fd2.append('customDateLabels', JSON.stringify(dateLabels))
+                const res2 = await fetch('/api/pdf', { method: 'POST', body: fd2 })
+                if (res2.ok) {
+                  const second = await res2.json()
+                  // Prefer the vendor-rule values only when they fill a gap.
+                  if (dateSuspicious && second.date) extractedData.date = second.date
+                  if (amountSuspicious && (second.amount !== null && second.amount !== undefined)) extractedData.amount = second.amount
+                }
+              }
+            }
           } catch {
             // PDF extraction failed — still add the document
           }
@@ -333,6 +369,16 @@ export default function DocumentsPage() {
       const sig = computeSignature(doc)
       tmplStore.addTemplate(firstWithContact.contactId, sig, doc.id)
       tmplStore.save().catch(() => { /* silent: non-critical learning hook */ })
+    }
+    // Learn vendor-specific extraction rules from the discrepancy between
+    // extracted values and the actual matched transaction values.
+    if (firstWithContact) {
+      const ruleStore = useVendorExtractionRuleStore.getState()
+      const inferred = inferRulesFromMatch(doc, firstWithContact)
+      if (inferred.length > 0) {
+        ruleStore.addRules(inferred)
+        ruleStore.save().catch(() => { /* silent: non-critical learning hook */ })
+      }
     }
     toast.success(`Matched ${newIds.length} transaction${newIds.length > 1 ? 's' : ''} to document`)
     setShowMatchDialog(false)

@@ -21,6 +21,37 @@ function parseMonthName(str: string): number {
   return -1
 }
 
+// Try a list of caller-supplied labels first. The label is the literal phrase
+// that, in this vendor's template, precedes the actual posted date. Format
+// detection mirrors extractDate. Returns the first hit; falls through if none.
+function extractDateWithCustomLabels(text: string, customLabels?: string[]): string | null {
+  if (!customLabels || customLabels.length === 0) return null
+  for (const label of customLabels) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    // ISO
+    let m = text.match(new RegExp(`${escaped}[:\\s]*\\b(\\d{4}-\\d{2}-\\d{2})\\b`, 'i'))
+    if (m) return m[1]
+    // US slash
+    m = text.match(new RegExp(`${escaped}[:\\s]*\\b(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})\\b`, 'i'))
+    if (m) {
+      const month = parseInt(m[1], 10), day = parseInt(m[2], 10), year = parseInt(m[3], 10)
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      }
+    }
+    // Month name
+    const monthNamePattern = MONTH_NAMES.join('|')
+    const monthAbbrPattern = MONTH_ABBREVS.join('|')
+    m = text.match(new RegExp(`${escaped}[:\\s]*\\b(${monthNamePattern}|${monthAbbrPattern})\\s+(\\d{1,2}),?\\s+(\\d{4})\\b`, 'i'))
+    if (m) {
+      const monthIndex = parseMonthName(m[1])
+      const day = parseInt(m[2], 10), year = parseInt(m[3], 10)
+      if (monthIndex >= 0) return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    }
+  }
+  return null
+}
+
 function extractDate(text: string): string | null {
   const isoMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/)
   if (isoMatch) return isoMatch[1]
@@ -514,6 +545,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const customLabelsStr = formData.get('customAmountLabels') as string | null
+    const customDateLabelsStr = formData.get('customDateLabels') as string | null
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -524,12 +556,16 @@ export async function POST(request: NextRequest) {
     const text = data.text
 
     const customLabels = customLabelsStr ? JSON.parse(customLabelsStr) : []
+    const customDateLabels = customDateLabelsStr ? JSON.parse(customDateLabelsStr) : []
 
     const entities = extractEntities(text)
 
+    // Custom date labels (vendor-learned) win when they match; otherwise fall back to the generic extractor.
+    const date = extractDateWithCustomLabels(text, customDateLabels) ?? extractDate(text)
+
     const result = {
       text,
-      date: extractDate(text),
+      date,
       amount: extractAmount(text, customLabels),
       vendor: extractVendor(text, entities),
       invoiceNumber: extractInvoiceNumber(text),
