@@ -438,27 +438,74 @@ function extractBillingPeriod(text: string): { month: number; year: number } | n
   return null
 }
 
+// Recipient labels — invoice issued TO whoever follows.
+const RECIPIENT_LABEL_RE = /^(bill(?:ed)?\s+to|sold\s+to|ship(?:ped)?\s+to|customer|client|issued\s+to)\b[:\s]*(.*)$/i
+// Issuer labels — invoice issued BY whoever follows.
+const ISSUER_LABEL_RE = /^(from|billed?\s+by|issued\s+by|seller|provider)\b[:\s]*(.*)$/i
+// Sub-labels that appear between the recipient label and the actual name and must be skipped.
+const SUBLABEL_LINE_RE = /^(attn|attention|c\/o|care\s+of)\b[:\s]*/i
+const SELF_HINT_RE = /\b(accurat|gabriele\s+rossi)\b/i
+
+function isSelfLine(line: string): boolean {
+  return SELF_HINT_RE.test(line) || isSelf(line.replace(/[,].*$/, '').trim())
+}
+
+// Take the value chunk that follows a label on the same line, stripping
+// any leading "Attn:" / "Attention:" sub-label.
+function stripSublabel(s: string): string {
+  return s.replace(SUBLABEL_LINE_RE, '').trim()
+}
+
+// Walk forward from `startIdx` (exclusive) through up to `maxLookahead`
+// non-empty lines, skipping sublabel lines, returning the first concrete
+// line of content (or null).
+function nextContentLine(lines: string[], startIdx: number, maxLookahead = 4): string | null {
+  for (let i = startIdx + 1; i < Math.min(lines.length, startIdx + 1 + maxLookahead); i++) {
+    const line = lines[i].trim()
+    if (!line) continue
+    if (SUBLABEL_LINE_RE.test(line)) {
+      // "Attn: <name>" — value may be on the same line after the sublabel
+      const after = stripSublabel(line)
+      if (after) return after
+      continue  // bare "Attn:" with value on the next line
+    }
+    return line
+  }
+  return null
+}
+
 function detectDirection(text: string): 'incoming' | 'outgoing' {
-  const incomingPatterns = [
-    /bill\s*(?:ed\s+)?to[:\s]+(?:.*?)accurat/i,
-    /issued\s+to[:\s]+(?:.*?)(?:gabriele|accurat)/i,
-    /sold\s+to[:\s]+(?:.*?)(?:gabriele|accurat)/i,
-    /ship\s*(?:ped\s+)?to[:\s]+(?:.*?)(?:gabriele|accurat)/i,
-    /customer[:\s]+(?:.*?)(?:gabriele|accurat)/i,
-  ]
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
 
-  const outgoingPatterns = [
-    /from[:\s]+(?:.*?)accurat/i,
-    /billed?\s+by[:\s]+(?:.*?)accurat/i,
-    /issued\s+by[:\s]+(?:.*?)accurat/i,
-  ]
+  // Phase 1: anchor on a recipient label. Whoever follows it (skipping
+  // sublabels) is who the invoice is billed TO. If that's us → incoming.
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(RECIPIENT_LABEL_RE)
+    if (!m) continue
+    let recipient = stripSublabel(m[2] ?? '')
+    if (!recipient) {
+      // Label was alone on the line; look ahead.
+      recipient = nextContentLine(lines, i) ?? ''
+    }
+    if (!recipient) continue
+    return isSelfLine(recipient) ? 'incoming' : 'outgoing'
+  }
 
-  for (const pattern of incomingPatterns) {
-    if (pattern.test(text)) return 'incoming'
+  // Phase 2: no recipient label found. Try issuer labels — if the issuer
+  // is us, this is outgoing.
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(ISSUER_LABEL_RE)
+    if (!m) continue
+    let issuer = stripSublabel(m[2] ?? '')
+    if (!issuer) issuer = nextContentLine(lines, i) ?? ''
+    if (!issuer) continue
+    return isSelfLine(issuer) ? 'outgoing' : 'incoming'
   }
-  for (const pattern of outgoingPatterns) {
-    if (pattern.test(text)) return 'outgoing'
-  }
+
+  // Phase 3: nothing labeled. If "Accurat" appears at all, assume it's
+  // our letterhead → outgoing. Otherwise default to incoming (the safer
+  // assumption for unlabeled receipts/bills).
+  if (SELF_HINT_RE.test(text)) return 'outgoing'
   return 'incoming'
 }
 
