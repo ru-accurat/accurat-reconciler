@@ -110,30 +110,49 @@ function extractAmount(text: string, customLabels?: string[]): number | null {
   return null
 }
 
+// "Self" — Accurat. The vendor field always means the counterparty, never us.
+// Hardcoded for now; could move to settings later.
+const SELF_ALIASES = [
+  'accurat', 'accurat usa', 'accurat usa inc', 'accurat usa inc.',
+  'accurat srl', 'accurat s.r.l.', 'accurat s.r.l',
+]
+const SELF_RE = new RegExp(
+  `^\\s*(?:${SELF_ALIASES.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\s*$`,
+  'i'
+)
+function isSelf(name: string): boolean {
+  return SELF_RE.test(name)
+}
+
+// Sub-labels that sometimes appear on a line by themselves (e.g. "Bill to\nAttn: X").
+// These must never end up as a captured business or person name.
+const SUBLABEL_STOPWORDS = new Set([
+  'attn', 'attention', 'c/o', 'care of', 'to', 'from', 'bill', 'sold', 'ship',
+  'mr', 'mrs', 'ms', 'dr',
+])
+
 function extractVendor(text: string, entities: ExtractedEntities): string | null {
-  // 1. Check explicit labels first
+  // 1. Check explicit labels first (skip if value would be self).
   const fromMatch = text.match(/(?:from|billed?\s+by|issued\s+by|seller|provider)[:\s]+([^\n]{3,50})/i)
   if (fromMatch) {
     const vendor = fromMatch[1].trim().replace(/[,.]$/, '')
-    if (vendor.length >= 2) return vendor
+    if (vendor.length >= 2 && !isSelf(vendor)) return vendor
   }
 
-  // 2. Use extracted business names (highest confidence)
-  if (entities.businessNames.length > 0) {
-    return entities.businessNames[0]
-  }
+  // 2. Use extracted business names, dropping self.
+  const nonSelfBusinesses = entities.businessNames.filter(n => !isSelf(n))
+  if (nonSelfBusinesses.length > 0) return nonSelfBusinesses[0]
 
-  // 3. Use extracted person names (if no business name found)
-  if (entities.personNames.length > 0) {
-    return entities.personNames[0]
-  }
+  // 3. Fall back to person names, dropping self.
+  const nonSelfPersons = entities.personNames.filter(n => !isSelf(n))
+  if (nonSelfPersons.length > 0) return nonSelfPersons[0]
 
-  // 4. Fall back to first line heuristic
+  // 4. First line heuristic (also drops self).
   const lines = text.split('\n').filter((l) => l.trim().length > 0)
   if (lines.length > 0) {
     const firstLine = lines[0].trim()
     if (firstLine.length >= 2 && firstLine.length <= 60 && /[a-zA-Z]/.test(firstLine) &&
-      !/^\d{1,2}[\/\-]/.test(firstLine) && !/^invoice/i.test(firstLine)) {
+      !/^\d{1,2}[\/\-]/.test(firstLine) && !/^invoice/i.test(firstLine) && !isSelf(firstLine)) {
       return firstLine.replace(/[,.]$/, '')
     }
   }
@@ -182,8 +201,9 @@ function extractBusinessNames(text: string): string[] {
   }
 
   // Pattern 2: Names near labels (Bill To, From, Customer, Vendor, etc.)
+  // Note: "Attention"/"Attn" are person-name labels — they live in extractPersonNames.
   const labelPatterns = [
-    /(?:bill(?:ed)?\s+to|sold\s+to|ship(?:ped)?\s+to|customer|client|attention|attn)[:\s]+([A-Z][A-Za-z\s&.,'-]{2,60})/gi,
+    /(?:bill(?:ed)?\s+to|sold\s+to|ship(?:ped)?\s+to|customer|client)[:\s]+([A-Z][A-Za-z\s&.,'-]{2,60})/gi,
     /(?:from|billed?\s+by|issued\s+by|seller|provider|vendor|payee|company)[:\s]+([A-Z][A-Za-z\s&.,'-]{2,60})/gi
   ]
 
@@ -192,7 +212,10 @@ function extractBusinessNames(text: string): string[] {
     while ((match = pattern.exec(text)) !== null) {
       // Take only the first line of the match
       const firstLine = match[1].split('\n')[0].trim().replace(/[,.]$/, '')
-      if (firstLine.length >= 2 && firstLine.length <= 60 && /[a-zA-Z]{2,}/.test(firstLine)) {
+      // Drop sublabel artifacts: when layout is "Bill to\nAttn: Name", the regex above
+      // eats the newline via `[:\s]+` and captures just "Attn" before stopping at the colon.
+      if (firstLine.length >= 2 && firstLine.length <= 60 && /[a-zA-Z]{2,}/.test(firstLine) &&
+          !SUBLABEL_STOPWORDS.has(firstLine.toLowerCase())) {
         names.add(firstLine)
       }
     }
