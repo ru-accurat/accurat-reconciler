@@ -43,15 +43,20 @@ const SUBLABEL_STOPWORDS = new Set([
 ])
 const isSublabel = (n) => typeof n === 'string' && SUBLABEL_STOPWORDS.has(n.trim().toLowerCase())
 
-const isBad = (n) => isSelf(n) || isSublabel(n)
+// A vendor string that contains a currency symbol or a money-shaped number
+// (e.g. "your last bill$925.75") is an extraction artifact from prose, never
+// a real vendor name. Same for strings that are just digits or look like dates.
+const isCurrencyArtifact = (n) =>
+  typeof n === 'string' && (/[$£€¥]/.test(n) || /\d+\.\d{2}/.test(n))
+
+const isBad = (n) => isSelf(n) || isSublabel(n) || isCurrencyArtifact(n)
 
 // Only touch docs whose existing vendor is itself a sublabel or self artifact.
 // We don't try to "improve" merely-messy vendors here — that's a different fix.
 // We also won't write null over a bad-but-existing string (that's strictly worse).
 function recomputeVendor(doc) {
   const oldVendor = doc.extractedVendor
-  const oldIsBad = isSublabel(oldVendor) || isSelf(oldVendor)
-  if (!oldIsBad) return null  // signal: skip this doc
+  if (!isBad(oldVendor)) return null  // signal: skip this doc
 
   const ents = doc.extractedEntities || { businessNames: [], personNames: [] }
   const cleanedBusinesses = (ents.businessNames || []).filter(n => !isBad(n))

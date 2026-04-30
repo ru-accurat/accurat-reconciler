@@ -164,7 +164,10 @@ const SUBLABEL_STOPWORDS = new Set([
 
 function extractVendor(text: string, entities: ExtractedEntities): string | null {
   // 1. Check explicit labels first (skip if value would be self).
-  const fromMatch = text.match(/(?:from|billed?\s+by|issued\s+by|seller|provider)[:\s]+([^\n]{3,50})/i)
+  // Anchored to start-of-line and requires a colon so we don't match the word
+  // "from" embedded in prose (e.g. ConEd's "Total charges from your last bill"
+  // would otherwise capture "your last bill$925.75" as the vendor).
+  const fromMatch = text.match(/^(?:from|billed?\s+by|issued\s+by|seller|provider):\s*([^\n]{3,50})/im)
   if (fromMatch) {
     const vendor = fromMatch[1].trim().replace(/[,.]$/, '')
     if (vendor.length >= 2 && !isSelf(vendor)) return vendor
@@ -469,10 +472,15 @@ function extractBillingPeriod(text: string): { month: number; year: number } | n
   return null
 }
 
-// Recipient labels — invoice issued TO whoever follows.
-const RECIPIENT_LABEL_RE = /^(bill(?:ed)?\s+to|sold\s+to|ship(?:ped)?\s+to|customer|client|issued\s+to)\b[:\s]*(.*)$/i
-// Issuer labels — invoice issued BY whoever follows.
-const ISSUER_LABEL_RE = /^(from|billed?\s+by|issued\s+by|seller|provider)\b[:\s]*(.*)$/i
+// Recipient labels — invoice issued TO whoever follows. Multi-word phrases
+// can be followed by an optional colon or just whitespace (PDF layouts vary).
+// Single-word labels like "Customer" and "Client" require an explicit colon
+// to avoid matching section headers like "Customer Special Services".
+const RECIPIENT_LABEL_PHRASE_RE = /^(bill(?:ed)?\s+to|sold\s+to|ship(?:ped)?\s+to|issued\s+to)\b[:\s]*(.*)$/i
+const RECIPIENT_LABEL_WORD_RE = /^(customer|client)\s*:\s*(.*)$/i
+// Issuer labels — same rule: phrases lenient, single words require a colon.
+const ISSUER_LABEL_PHRASE_RE = /^(billed?\s+by|issued\s+by)\b[:\s]*(.*)$/i
+const ISSUER_LABEL_WORD_RE = /^(from|seller|provider)\s*:\s*(.*)$/i
 // Sub-labels that appear between the recipient label and the actual name and must be skipped.
 const SUBLABEL_LINE_RE = /^(attn|attention|c\/o|care\s+of)\b[:\s]*/i
 const SELF_HINT_RE = /\b(accurat|gabriele\s+rossi)\b/i
@@ -511,7 +519,7 @@ function detectDirection(text: string): 'incoming' | 'outgoing' {
   // Phase 1: anchor on a recipient label. Whoever follows it (skipping
   // sublabels) is who the invoice is billed TO. If that's us → incoming.
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(RECIPIENT_LABEL_RE)
+    const m = lines[i].match(RECIPIENT_LABEL_PHRASE_RE) ?? lines[i].match(RECIPIENT_LABEL_WORD_RE)
     if (!m) continue
     let recipient = stripSublabel(m[2] ?? '')
     if (!recipient) {
@@ -525,7 +533,7 @@ function detectDirection(text: string): 'incoming' | 'outgoing' {
   // Phase 2: no recipient label found. Try issuer labels — if the issuer
   // is us, this is outgoing.
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(ISSUER_LABEL_RE)
+    const m = lines[i].match(ISSUER_LABEL_PHRASE_RE) ?? lines[i].match(ISSUER_LABEL_WORD_RE)
     if (!m) continue
     let issuer = stripSublabel(m[2] ?? '')
     if (!issuer) issuer = nextContentLine(lines, i) ?? ''
@@ -533,10 +541,12 @@ function detectDirection(text: string): 'incoming' | 'outgoing' {
     return isSelfLine(issuer) ? 'outgoing' : 'incoming'
   }
 
-  // Phase 3: nothing labeled. If "Accurat" appears at all, assume it's
-  // our letterhead → outgoing. Otherwise default to incoming (the safer
-  // assumption for unlabeled receipts/bills).
-  if (SELF_HINT_RE.test(text)) return 'outgoing'
+  // Phase 3: nothing labeled. Default to incoming. The previous "if Accurat
+  // appears anywhere → outgoing" heuristic was wrong for utility bills (ConEd,
+  // T-Mobile, etc.) — they put the customer's name and address at the top
+  // without any "Bill To:" label, so "Accurat appears" matches but the doc is
+  // actually addressed TO us. Bills/receipts received vastly outnumber
+  // unlabeled invoices we issue, so default-incoming is the safer fallback.
   return 'incoming'
 }
 

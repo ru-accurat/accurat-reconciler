@@ -26,8 +26,10 @@ const SELF_ALIASES = ['accurat', 'accurat usa', 'accurat usa inc', 'accurat usa 
 const SELF_RE = new RegExp(`^\\s*(?:${SELF_ALIASES.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\s*$`, 'i')
 const isSelf = (n) => typeof n === 'string' && SELF_RE.test(n)
 
-const RECIPIENT_LABEL_RE = /^(bill(?:ed)?\s+to|sold\s+to|ship(?:ped)?\s+to|customer|client|issued\s+to)\b[:\s]*(.*)$/i
-const ISSUER_LABEL_RE    = /^(from|billed?\s+by|issued\s+by|seller|provider)\b[:\s]*(.*)$/i
+const RECIPIENT_LABEL_PHRASE_RE = /^(bill(?:ed)?\s+to|sold\s+to|ship(?:ped)?\s+to|issued\s+to)\b[:\s]*(.*)$/i
+const RECIPIENT_LABEL_WORD_RE   = /^(customer|client)\s*:\s*(.*)$/i
+const ISSUER_LABEL_PHRASE_RE    = /^(billed?\s+by|issued\s+by)\b[:\s]*(.*)$/i
+const ISSUER_LABEL_WORD_RE      = /^(from|seller|provider)\s*:\s*(.*)$/i
 const SUBLABEL_LINE_RE   = /^(attn|attention|c\/o|care\s+of)\b[:\s]*/i
 const SELF_HINT_RE       = /\b(accurat|gabriele\s+rossi)\b/i
 
@@ -53,7 +55,7 @@ function detectDirection(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
 
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(RECIPIENT_LABEL_RE)
+    const m = lines[i].match(RECIPIENT_LABEL_PHRASE_RE) ?? lines[i].match(RECIPIENT_LABEL_WORD_RE)
     if (!m) continue
     let recipient = stripSublabel(m[2] ?? '')
     if (!recipient) recipient = nextContentLine(lines, i) ?? ''
@@ -62,7 +64,7 @@ function detectDirection(text) {
   }
 
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(ISSUER_LABEL_RE)
+    const m = lines[i].match(ISSUER_LABEL_PHRASE_RE) ?? lines[i].match(ISSUER_LABEL_WORD_RE)
     if (!m) continue
     let issuer = stripSublabel(m[2] ?? '')
     if (!issuer) issuer = nextContentLine(lines, i) ?? ''
@@ -70,7 +72,7 @@ function detectDirection(text) {
     return isSelfLine(issuer) ? 'outgoing' : 'incoming'
   }
 
-  if (SELF_HINT_RE.test(text)) return 'outgoing'
+  // Phase 3 mirrors route.ts: default unlabeled docs to incoming.
   return 'incoming'
 }
 
