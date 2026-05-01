@@ -12,7 +12,9 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
     "@tanstack/react-table": "^8.20.0",
+    "archiver": "^7.0.1",
     "date-fns": "^3.6.0",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.460.0",
     "next": "^15.3.0",
     "papaparse": "^5.4.1",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
+    "@types/archiver": "^7.0.0",
     "@types/node": "^22.0.0",
     "@types/papaparse": "^5.3.14",
     "@types/pdf-parse": "^1.1.4",
