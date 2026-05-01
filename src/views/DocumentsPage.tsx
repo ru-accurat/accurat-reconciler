@@ -15,7 +15,7 @@ import { useVendorExtractionRuleStore } from '@/stores/vendorExtractionRuleStore
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { formatCurrency, formatDate } from '@/lib/formatters'
-import { matchDocument, isAutoMatch, updateContactFromEntities } from '@/lib/document-matcher'
+import { matchDocument, isAutoMatch, findAutoMatchIds, updateContactFromEntities } from '@/lib/document-matcher'
 import { computeSignature } from '@/lib/invoice-template'
 import { inferRulesFromMatch } from '@/lib/extraction-feedback'
 import { supabase } from '@/lib/supabase'
@@ -245,42 +245,42 @@ export default function DocumentsPage() {
           let autoMatched = 0
           for (const doc of currentDocs.filter(d => d.matchedTransactionIds.length === 0)) {
             const candidates = matchDocument(doc, currentTxns, currentContacts, currentAliases, currentTemplates, claimedTxnIds)
-            if (isAutoMatch(candidates)) {
-              const best = candidates[0]
-              claimedTxnIds.add(best.transactionId)  // claim for subsequent iterations
-              useDocumentStore.getState().updateDocument(doc.id, {
-                matchedTransactionIds: [best.transactionId],
-                matchConfidence: best.score,
-                matchMethod: 'auto'
-              })
-              const txn = currentTxns.find(t => t.id === best.transactionId)
+            const matchIds = findAutoMatchIds(candidates, currentTxns, claimedTxnIds)
+            if (matchIds.length === 0) continue
+            for (const id of matchIds) claimedTxnIds.add(id)
+            useDocumentStore.getState().updateDocument(doc.id, {
+              matchedTransactionIds: matchIds,
+              matchConfidence: candidates[0].score,
+              matchMethod: 'auto'
+            })
+            const primaryTxn = currentTxns.find(t => t.id === candidates[0].transactionId)
+            for (const txnId of matchIds) {
+              const txn = currentTxns.find(t => t.id === txnId)
               if (txn) {
-                useTransactionStore.getState().updateTransaction(best.transactionId, {
+                useTransactionStore.getState().updateTransaction(txnId, {
                   documentIds: [...txn.documentIds, doc.id],
                   status: 'reconciled'
                 })
               }
-              if (doc.extractedVendor && txn?.contactId) {
-                useVendorAliasStore.getState().addAlias(doc.extractedVendor, txn.contactId)
-                // Learn transaction pattern for the contact
-                const contact = currentContacts.find(c => c.id === txn.contactId)
-                if (contact) {
-                  const tokens = txn.rawDescription.toUpperCase().split(/[\s\-_.,#*]+/).filter(t => t.length > 2)
-                  if (tokens.length > 0) {
-                    const pattern = tokens.slice(0, 4).join(' ')
-                    const existing = contact.transactionPatterns.map(p => p.toUpperCase())
-                    if (!existing.some(p => p.includes(pattern) || pattern.includes(p)) && !/^\d[\d\s/\-]*$/.test(pattern)) {
-                      useContactStore.getState().updateContact(txn.contactId, { transactionPatterns: [...contact.transactionPatterns, pattern] })
-                    }
+            }
+            if (doc.extractedVendor && primaryTxn?.contactId) {
+              useVendorAliasStore.getState().addAlias(doc.extractedVendor, primaryTxn.contactId)
+              const contact = currentContacts.find(c => c.id === primaryTxn.contactId)
+              if (contact) {
+                const tokens = primaryTxn.rawDescription.toUpperCase().split(/[\s\-_.,#*]+/).filter(t => t.length > 2)
+                if (tokens.length > 0) {
+                  const pattern = tokens.slice(0, 4).join(' ')
+                  const existing = contact.transactionPatterns.map(p => p.toUpperCase())
+                  if (!existing.some(p => p.includes(pattern) || pattern.includes(p)) && !/^\d[\d\s/\-]*$/.test(pattern)) {
+                    useContactStore.getState().updateContact(primaryTxn.contactId, { transactionPatterns: [...contact.transactionPatterns, pattern] })
                   }
                 }
               }
-              // Update contact with extracted entities from the document
-              if (txn?.contactId) {
-                updateContactFromEntities(doc, txn.contactId, currentContacts, useContactStore.getState().updateContact)
-              }
-              autoMatched++
             }
+            if (primaryTxn?.contactId) {
+              updateContactFromEntities(doc, primaryTxn.contactId, currentContacts, useContactStore.getState().updateContact)
+            }
+            autoMatched++
           }
           if (autoMatched > 0) toast.success(`Auto-matched ${autoMatched} document${autoMatched > 1 ? 's' : ''}`)
         }, 100)
@@ -305,31 +305,32 @@ export default function DocumentsPage() {
     let matched = 0
     for (const doc of unmatchedDocs) {
       const candidates = matchDocument(doc, transactions, contacts, vendorAliases, templates, claimedTxnIds)
-      if (isAutoMatch(candidates)) {
-        const best = candidates[0]
-        claimedTxnIds.add(best.transactionId)
-        updateDocument(doc.id, {
-          matchedTransactionIds: [best.transactionId],
-          matchConfidence: best.score,
-          matchMethod: 'auto'
-        })
-        const txn = transactions.find(t => t.id === best.transactionId)
+      const matchIds = findAutoMatchIds(candidates, transactions, claimedTxnIds)
+      if (matchIds.length === 0) continue
+      for (const id of matchIds) claimedTxnIds.add(id)
+      updateDocument(doc.id, {
+        matchedTransactionIds: matchIds,
+        matchConfidence: candidates[0].score,
+        matchMethod: 'auto'
+      })
+      const primaryTxn = transactions.find(t => t.id === candidates[0].transactionId)
+      for (const txnId of matchIds) {
+        const txn = transactions.find(t => t.id === txnId)
         if (txn) {
-          updateTransaction(best.transactionId, {
+          updateTransaction(txnId, {
             documentIds: [...txn.documentIds, doc.id],
             status: 'reconciled'
           })
         }
-        if (doc.extractedVendor && txn?.contactId) {
-          addAlias(doc.extractedVendor, txn.contactId)
-          learnTransactionPattern(txn, txn.contactId)
-        }
-        // Update contact with extracted entities (address, email, phone, etc.)
-        if (txn?.contactId) {
-          updateContactFromEntities(doc, txn.contactId, contacts, updateContact)
-        }
-        matched++
       }
+      if (doc.extractedVendor && primaryTxn?.contactId) {
+        addAlias(doc.extractedVendor, primaryTxn.contactId)
+        learnTransactionPattern(primaryTxn, primaryTxn.contactId)
+      }
+      if (primaryTxn?.contactId) {
+        updateContactFromEntities(doc, primaryTxn.contactId, contacts, updateContact)
+      }
+      matched++
     }
     if (matched > 0) {
       toast.success(`Auto-matched ${matched} document${matched > 1 ? 's' : ''} (${unmatchedDocs.length - matched} remaining)`)

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { matchDocument, isAutoMatch } from '@/lib/document-matcher'
+import { matchDocument, isAutoMatch, findAutoMatchIds } from '@/lib/document-matcher'
 import { Transaction, DocumentRecord, Contact, VendorAlias } from '@/lib/types'
 import { InvoiceTemplate } from '@/lib/invoice-template'
 
@@ -35,7 +35,7 @@ export async function POST() {
     originalFilename: string
     extractedVendor: string | null
     extractedAmount: number | null
-    transactionId: string
+    transactionIds: string[]
     score: number
     templateMatchScore?: number
     templateContactId?: string | null
@@ -46,16 +46,17 @@ export async function POST() {
 
   for (const doc of unmatched) {
     const candidates = matchDocument(doc, transactions, contacts, vendorAliases, templates, claimedTxnIds)
-    if (!isAutoMatch(candidates)) continue
+    const matchIds = findAutoMatchIds(candidates, transactions, claimedTxnIds)
+    if (matchIds.length === 0) continue
+    for (const id of matchIds) claimedTxnIds.add(id)
     const best = candidates[0]
-    claimedTxnIds.add(best.transactionId)
     const txn = transactions.find(t => t.id === best.transactionId)
     proposals.push({
       docId: doc.id,
       originalFilename: doc.originalFilename,
       extractedVendor: doc.extractedVendor ?? null,
       extractedAmount: doc.extractedAmount ?? null,
-      transactionId: best.transactionId,
+      transactionIds: matchIds,
       score: best.score,
       templateMatchScore: best.templateMatchScore,
       templateContactId: best.templateContactId,

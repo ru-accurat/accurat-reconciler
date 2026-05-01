@@ -48,7 +48,9 @@ if (proposals.length === 0) {
 console.log('=== Proposals ===')
 for (const p of proposals) {
   const tplInfo = p.templateMatchScore ? ` template=${p.templateMatchScore.toFixed(2)}` : ''
-  console.log(`  ${p.docId.slice(0, 8)}  ${p.originalFilename.padEnd(34)}  $${p.extractedAmount}  vendor="${p.extractedVendor}"  -> ${p.contactName ?? '(no contact)'}  score=${p.score}${tplInfo}`)
+  const ids = p.transactionIds ?? (p.transactionId ? [p.transactionId] : [])
+  const multiInfo = ids.length > 1 ? ` [${ids.length} txns]` : ''
+  console.log(`  ${p.docId.slice(0, 8)}  ${p.originalFilename.padEnd(34)}  $${p.extractedAmount}  vendor="${p.extractedVendor}"  -> ${p.contactName ?? '(no contact)'}  score=${p.score}${tplInfo}${multiInfo}`)
 }
 
 if (!WRITE) {
@@ -77,10 +79,11 @@ const claimedNow = new Map() // txnId -> docId, to update transactions in lockst
 const updatedDocs = docs.map(d => {
   const p = proposalByDocId.get(d.id)
   if (!p) return d
-  claimedNow.set(p.transactionId, d.id)
+  const ids = p.transactionIds ?? (p.transactionId ? [p.transactionId] : [])
+  for (const id of ids) claimedNow.set(id, d.id)
   return {
     ...d,
-    matchedTransactionIds: [p.transactionId],
+    matchedTransactionIds: ids,
     matchConfidence: p.score,
     matchMethod: 'auto',
   }

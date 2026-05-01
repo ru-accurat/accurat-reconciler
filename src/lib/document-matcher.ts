@@ -243,6 +243,48 @@ export function isAutoMatch(candidates: MatchCandidate[]): boolean {
 }
 
 /**
+ * Returns the full set of transaction IDs to assign to a document in one
+ * auto-match pass.  For a normal doc it returns [primaryId].  For recurring
+ * docs (payroll summary, multi-period utility statement) it also includes
+ * every other unclaimed candidate that shares the same contact and exact
+ * amount as the primary — so a single payroll PDF can absorb all the
+ * monthly ADP debits in one shot.
+ *
+ * Multi-match only engages when the primary hit has a strong template score
+ * (≥ TEMPLATE_MATCH_THRESHOLD) so we know which contact the doc belongs to.
+ */
+export function findAutoMatchIds(
+  candidates: MatchCandidate[],
+  transactions: Transaction[],
+  excludeTxnIds?: Set<string>
+): string[] {
+  if (!isAutoMatch(candidates)) return []
+  const primary = candidates[0]
+  const primaryTxn = transactions.find(t => t.id === primary.transactionId)
+
+  // Only expand to multi-match when we have high template confidence and a
+  // known contact, otherwise stick to the single best match.
+  if (!primaryTxn?.contactId || (primary.templateMatchScore ?? 0) < TEMPLATE_MATCH_THRESHOLD) {
+    return [primary.transactionId]
+  }
+
+  const contactId = primaryTxn.contactId
+  const ids = candidates
+    .filter(c => {
+      if (excludeTxnIds?.has(c.transactionId)) return false
+      const txn = transactions.find(t => t.id === c.transactionId)
+      return (
+        txn?.contactId === contactId &&
+        c.amountMatch &&       // exact amount
+        c.score >= 0.5         // still a plausible match (lower bar for secondary hits)
+      )
+    })
+    .map(c => c.transactionId)
+
+  return ids.length > 0 ? ids : [primary.transactionId]
+}
+
+/**
  * After a document is matched to a transaction (auto or manual),
  * update the contact with extracted entities (address, email, phone, VAT).
  * Only fills in empty fields — never overwrites existing data.
