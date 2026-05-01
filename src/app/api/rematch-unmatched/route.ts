@@ -14,22 +14,69 @@ export async function POST() {
   if (!url || !key) return NextResponse.json({ error: 'Supabase env not set' }, { status: 500 })
   const supabase = createClient(url, key)
 
-  // Inner JSONB key now matches the outer row key (Phase 0 rename). The
-  // legacy fallback below covers rows that haven't been re-saved yet by the
-  // new client code — drops out of use once every store has run save() once.
-  const fetchKey = async <T,>(k: string, field: string, legacyField?: string): Promise<T[]> => {
-    const { data } = await supabase.from('app_data').select('value').eq('key', k).single()
-    const items = data?.value?.[field] ?? (legacyField ? data?.value?.[legacyField] : undefined)
-    return (items ?? []) as T[]
+  // Read straight from the relational tables (Phase 4 schema).
+  const [{ data: txnRows }, { data: docRows }, { data: contactRows }, { data: aliasRows }, { data: tmplRows }, { data: junction }] =
+    await Promise.all([
+      supabase.from('transactions').select('*'),
+      supabase.from('documents').select('*'),
+      supabase.from('contacts').select('*'),
+      supabase.from('vendor_aliases').select('*'),
+      supabase.from('invoice_templates').select('*'),
+      supabase.from('document_transactions').select('document_id, transaction_id'),
+    ])
+
+  const txnsByDoc = new Map<string, string[]>()
+  for (const j of junction ?? []) {
+    const arr = txnsByDoc.get(j.document_id) ?? []
+    arr.push(j.transaction_id)
+    txnsByDoc.set(j.document_id, arr)
   }
 
-  const [docs, transactions, contacts, vendorAliases, templates] = await Promise.all([
-    fetchKey<DocumentRecord>('documents', 'documents'),
-    fetchKey<Transaction>('transactions', 'transactions'),
-    fetchKey<Contact>('contacts', 'contacts'),
-    fetchKey<VendorAlias>('vendorAliases', 'vendorAliases', 'aliases'),
-    fetchKey<InvoiceTemplate>('invoiceTemplates', 'invoiceTemplates', 'templates'),
-  ])
+  const transactions: Transaction[] = (txnRows ?? []).map((r: any) => ({
+    id: r.id, hash: r.hash, date: r.date,
+    rawDescription: r.raw_description, amount: Number(r.amount), type: r.type,
+    contactId: r.contact_id, categoryId: r.category_id,
+    billingPeriod: r.billing_period_year != null && r.billing_period_month != null
+      ? { year: r.billing_period_year, month: r.billing_period_month } : null,
+    billingPeriodOverride: !!r.billing_period_override,
+    status: r.status, documentIds: [],
+    splitParts: r.split_parts ?? null,
+    notes: r.notes ?? '', ruleIdApplied: r.rule_id_applied ?? null,
+    importedAt: r.imported_at, updatedAt: r.updated_at,
+  }))
+  const docs: DocumentRecord[] = (docRows ?? []).map((r: any) => ({
+    id: r.id, originalFilename: r.original_filename, storedPath: r.stored_path,
+    thumbnailPath: r.thumbnail_path ?? null,
+    historicalPaths: Array.isArray(r.historical_paths) ? r.historical_paths : [],
+    extractedText: r.extracted_text ?? '',
+    extractedDate: r.extracted_date ?? null,
+    extractedAmount: r.extracted_amount != null ? Number(r.extracted_amount) : null,
+    extractedVendor: r.extracted_vendor ?? null,
+    extractedInvoiceNumber: r.extracted_invoice_number ?? null,
+    extractedBillingPeriod: r.extracted_billing_year != null && r.extracted_billing_month != null
+      ? { year: r.extracted_billing_year, month: r.extracted_billing_month } : null,
+    extractedEntities: r.extracted_entities ?? undefined,
+    direction: r.direction ?? 'incoming',
+    matchedTransactionIds: txnsByDoc.get(r.id) ?? [],
+    matchConfidence: Number(r.match_confidence ?? 0),
+    matchMethod: r.match_method ?? 'auto',
+    scannedAt: r.scanned_at,
+  }))
+  const contacts: Contact[] = (contactRows ?? []).map((r: any) => ({
+    id: r.id, name: r.name, legalEntityName: r.legal_entity_name ?? '', type: r.type,
+    vatTaxId: r.vat_tax_id ?? '', address: r.address ?? '', email: r.email ?? '', phone: r.phone ?? '',
+    notes: r.notes ?? '',
+    transactionPatterns: Array.isArray(r.transaction_patterns) ? r.transaction_patterns : [],
+    source: r.source ?? 'manual',
+    createdAt: r.created_at, updatedAt: r.updated_at,
+  }))
+  const vendorAliases: VendorAlias[] = (aliasRows ?? []).map((r: any) => ({
+    extractedVendor: r.extracted_vendor, contactId: r.contact_id, learnedAt: r.learned_at,
+  }))
+  const templates: InvoiceTemplate[] = (tmplRows ?? []).map((r: any) => ({
+    id: r.id, contactId: r.contact_id, signature: r.signature,
+    learnedFromDocId: r.learned_from_doc_id ?? null, learnedAt: r.learned_at,
+  }))
 
   const claimedTxnIds = new Set<string>(docs.flatMap(d => d.matchedTransactionIds ?? []))
   const unmatched = docs.filter(d => (d.matchedTransactionIds ?? []).length === 0)

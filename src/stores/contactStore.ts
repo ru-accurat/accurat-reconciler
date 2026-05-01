@@ -53,16 +53,37 @@ export const useContactStore = create<ContactState>((set, get) => ({
 
   save: async () => {
     const { contacts } = get()
-    await supabase
-      .from('app_data')
-      .upsert({ key: 'contacts', value: { version: 1, lastModified: new Date().toISOString(), contacts } })
+    if (contacts.length === 0) return
+    const rows = contacts.map((c) => ({
+      id: c.id, name: c.name, legal_entity_name: c.legalEntityName ?? '',
+      type: c.type, vat_tax_id: c.vatTaxId ?? '',
+      address: c.address ?? '', email: c.email ?? '', phone: c.phone ?? '',
+      notes: c.notes ?? '',
+      transaction_patterns: c.transactionPatterns ?? [],
+      source: c.source ?? 'manual',
+      created_at: c.createdAt, updated_at: c.updatedAt,
+    }))
+    const { error } = await supabase.from('contacts').upsert(rows, { onConflict: 'id' })
+    if (error) { console.error('contactStore.save failed:', error); throw error }
   },
 
   load: async () => {
     set({ isLoading: true })
     try {
-      const { data } = await supabase.from('app_data').select('value').eq('key', 'contacts').single()
-      if (data?.value?.contacts) set({ contacts: data.value.contacts })
+      const { data, error } = await supabase.from('contacts').select('*')
+      if (error) { console.error('contactStore.load failed:', error); return }
+      const contacts: Contact[] = (data ?? []).map((r: any) => ({
+        id: r.id, name: r.name,
+        legalEntityName: r.legal_entity_name ?? '',
+        type: r.type,
+        vatTaxId: r.vat_tax_id ?? '',
+        address: r.address ?? '', email: r.email ?? '', phone: r.phone ?? '',
+        notes: r.notes ?? '',
+        transactionPatterns: Array.isArray(r.transaction_patterns) ? r.transaction_patterns : [],
+        source: r.source ?? 'manual',
+        createdAt: r.created_at, updatedAt: r.updated_at,
+      }))
+      set({ contacts })
     } finally {
       set({ isLoading: false })
     }

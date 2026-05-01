@@ -46,16 +46,30 @@ export const useInvoiceTemplateStore = create<InvoiceTemplateState>((set, get) =
 
   save: async () => {
     const { templates } = get()
-    await supabase
-      .from('app_data')
-      .upsert({ key: 'invoiceTemplates', value: { version: 1, lastModified: new Date().toISOString(), invoiceTemplates: templates } })
+    if (templates.length === 0) return
+    const rows = templates.map((t) => ({
+      id: t.id,
+      contact_id: t.contactId,
+      signature: t.signature,
+      learned_from_doc_id: t.learnedFromDocId ?? null,
+      learned_at: t.learnedAt,
+    }))
+    const { error } = await supabase
+      .from('invoice_templates')
+      .upsert(rows, { onConflict: 'id' })
+    if (error) { console.error('invoiceTemplateStore.save failed:', error); throw error }
   },
 
   load: async () => {
-    const { data } = await supabase.from('app_data').select('value').eq('key', 'invoiceTemplates').single()
-    // Fall back to the legacy 'templates' inner key for any row that hasn't
-    // been re-saved under the new schema yet (Phase 0 rename window).
-    const items = data?.value?.invoiceTemplates ?? data?.value?.templates
-    if (Array.isArray(items)) set({ templates: items })
+    const { data, error } = await supabase.from('invoice_templates').select('*')
+    if (error) { console.error('invoiceTemplateStore.load failed:', error); return }
+    const templates = (data ?? []).map((r: any) => ({
+      id: r.id,
+      contactId: r.contact_id,
+      signature: r.signature,
+      learnedFromDocId: r.learned_from_doc_id ?? null,
+      learnedAt: r.learned_at,
+    }))
+    set({ templates })
   },
 }))

@@ -66,19 +66,47 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   save: async () => {
     const { settings } = get()
-    await supabase.from('app_data').upsert({ key: 'settings', value: settings })
+    const { error } = await supabase.from('app_settings').upsert({
+      id: 'main',
+      version: settings.version,
+      default_bank: settings.defaultBank,
+      csv_date_format: settings.csvDateFormat,
+      theme: settings.theme,
+      default_sort_field: settings.defaultSort?.field ?? 'date',
+      default_sort_dir:   settings.defaultSort?.direction ?? 'desc',
+      date_proximity_days: settings.dateProximityDays,
+      business_name: settings.businessName ?? '',
+      business_tax_id: settings.businessTaxId ?? '',
+      custom_amount_labels: settings.customAmountLabels ?? [],
+      contract_patterns: settings.contractPatterns ?? [],
+    }, { onConflict: 'id' })
+    if (error) { console.error('settingsStore.save failed:', error); throw error }
   },
 
   load: async () => {
     set({ isLoading: true })
     try {
-      const { data } = await supabase.from('app_data').select('value').eq('key', 'settings').single()
-      if (data?.value) {
-        set({ settings: data.value })
+      const { data, error } = await supabase
+        .from('app_settings').select('*').eq('id', 'main').single()
+      if (error) { console.error('settingsStore.load failed:', error); return }
+      if (data) {
+        const settings: AppSettings = {
+          version: data.version ?? 1,
+          defaultBank: data.default_bank ?? 'chase',
+          csvDateFormat: data.csv_date_format ?? 'MM/DD/YYYY',
+          theme: data.theme ?? 'light',
+          defaultSort: { field: data.default_sort_field ?? 'date', direction: data.default_sort_dir ?? 'desc' },
+          dateProximityDays: data.date_proximity_days ?? 30,
+          businessName: data.business_name ?? '',
+          businessTaxId: data.business_tax_id ?? '',
+          customAmountLabels: Array.isArray(data.custom_amount_labels) ? data.custom_amount_labels : [],
+          contractPatterns: Array.isArray(data.contract_patterns) ? data.contract_patterns : [],
+        }
+        set({ settings })
         const stored = typeof localStorage !== 'undefined'
           ? localStorage.getItem('reconciler-theme') as 'light' | 'dark' | 'system' | null
           : null
-        applyThemeToDocument(stored || data.value.theme)
+        applyThemeToDocument(stored || settings.theme)
       }
     } finally {
       set({ isLoading: false })

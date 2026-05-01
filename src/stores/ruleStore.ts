@@ -78,16 +78,37 @@ export const useRuleStore = create<RuleState>((set, get) => ({
 
   save: async () => {
     const { rules } = get()
-    await supabase
-      .from('app_data')
-      .upsert({ key: 'rules', value: { version: 1, lastModified: new Date().toISOString(), rules } })
+    if (rules.length === 0) return
+    const rows = rules.map((r) => ({
+      id: r.id, name: r.name, priority: r.priority,
+      match_type: r.matchType, pattern: r.pattern,
+      case_sensitive: !!r.caseSensitive,
+      category_id: r.categoryId, contact_id: r.contactId,
+      enabled: r.enabled, applied_count: r.appliedCount,
+      source: r.source, created_at: r.createdAt, updated_at: r.updatedAt,
+    }))
+    const { error } = await supabase.from('categorization_rules').upsert(rows, { onConflict: 'id' })
+    if (error) { console.error('ruleStore.save failed:', error); throw error }
   },
 
   load: async () => {
     set({ isLoading: true })
     try {
-      const { data } = await supabase.from('app_data').select('value').eq('key', 'rules').single()
-      if (data?.value?.rules) set({ rules: data.value.rules })
+      const { data, error } = await supabase
+        .from('categorization_rules')
+        .select('*')
+        .order('priority', { ascending: true })
+      if (error) { console.error('ruleStore.load failed:', error); return }
+      const rules: CategorizationRule[] = (data ?? []).map((r: any) => ({
+        id: r.id, name: r.name, priority: r.priority,
+        matchType: r.match_type, pattern: r.pattern,
+        caseSensitive: !!r.case_sensitive,
+        categoryId: r.category_id, contactId: r.contact_id ?? null,
+        enabled: !!r.enabled, appliedCount: r.applied_count ?? 0,
+        source: r.source ?? 'manual',
+        createdAt: r.created_at, updatedAt: r.updated_at,
+      }))
+      set({ rules })
     } finally {
       set({ isLoading: false })
     }

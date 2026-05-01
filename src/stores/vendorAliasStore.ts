@@ -54,16 +54,26 @@ export const useVendorAliasStore = create<VendorAliasState>((set, get) => ({
 
   save: async () => {
     const { aliases } = get()
-    await supabase
-      .from('app_data')
-      .upsert({ key: 'vendorAliases', value: { version: 1, lastModified: new Date().toISOString(), vendorAliases: aliases } })
+    if (aliases.length === 0) return
+    const rows = aliases.map((a) => ({
+      extracted_vendor: a.extractedVendor,
+      contact_id: a.contactId,
+      learned_at: a.learnedAt,
+    }))
+    const { error } = await supabase
+      .from('vendor_aliases')
+      .upsert(rows, { onConflict: 'extracted_vendor' })
+    if (error) { console.error('vendorAliasStore.save failed:', error); throw error }
   },
 
   load: async () => {
-    const { data } = await supabase.from('app_data').select('value').eq('key', 'vendorAliases').single()
-    // Fall back to the legacy 'aliases' inner key for any row that hasn't
-    // been re-saved under the new schema yet (Phase 0 rename window).
-    const items = data?.value?.vendorAliases ?? data?.value?.aliases
-    if (Array.isArray(items)) set({ aliases: items })
+    const { data, error } = await supabase.from('vendor_aliases').select('*')
+    if (error) { console.error('vendorAliasStore.load failed:', error); return }
+    const aliases = (data ?? []).map((r: any) => ({
+      extractedVendor: r.extracted_vendor,
+      contactId: r.contact_id,
+      learnedAt: r.learned_at,
+    }))
+    set({ aliases })
   }
 }))

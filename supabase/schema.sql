@@ -1,36 +1,33 @@
--- Reconciler Web — Supabase Schema
--- Single-table JSON document store (mirrors the Electron JSON file approach)
--- This keeps the migration simple and preserves the existing data shape.
+-- Reconciler — schema reference
+--
+-- The live schema is created by:
+--   supabase/migrations/001_relational_schema.sql
+--
+-- That migration defines the relational tables every new client write
+-- targets (categories, contacts, transactions, documents, the
+-- document_transactions junction, categorization_rules, vendor_aliases,
+-- invoice_templates, vendor_extraction_rules, app_settings).
+--
+-- The legacy `app_data` single-table JSONB blob below is kept as
+-- forensic reference; it will be dropped after a verification window.
 
+-- ----------------------------------------------------------------------
+-- Legacy JSONB blob — read-only forensic copy. NEW CODE DOES NOT WRITE.
+-- ----------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_data (
   key TEXT PRIMARY KEY,
   value JSONB NOT NULL DEFAULT '{}',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
--- Enable RLS (but allow all operations for now — no auth)
 ALTER TABLE app_data ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='app_data' AND policyname='Allow all access') THEN
+    CREATE POLICY "Allow all access" ON app_data FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
--- Allow anonymous access (single-user app)
-CREATE POLICY "Allow all access" ON app_data
-  FOR ALL
-  USING (true)
-  WITH CHECK (true);
-
--- Storage bucket for document files (PDFs, invoices)
--- Run this via Supabase Dashboard > Storage > New Bucket
--- Bucket name: documents
--- Public: false
-
--- Seed the initial data rows so upserts work
-INSERT INTO app_data (key, value) VALUES
-  ('transactions', '{"version": 1, "lastModified": null, "transactions": []}'),
-  ('contacts', '{"version": 1, "lastModified": null, "contacts": []}'),
-  ('categories', '{"version": 1, "lastModified": null, "categories": []}'),
-  ('rules', '{"version": 1, "lastModified": null, "rules": []}'),
-  ('documents', '{"version": 1, "lastModified": null, "documents": []}'),
-  ('vendorAliases', '{"version": 1, "lastModified": null, "aliases": []}'),
-  ('invoiceTemplates', '{"version": 1, "lastModified": null, "templates": []}'),
-  ('vendorExtractionRules', '{"version": 1, "lastModified": null, "rules": []}'),
-  ('settings', '{}')
-ON CONFLICT (key) DO NOTHING;
+-- ----------------------------------------------------------------------
+-- Storage bucket: `documents` (PDFs + thumbnails). Created via Supabase
+-- Dashboard. Anon-key INSERT/UPDATE/DELETE granted; the dedicated `move`
+-- action is intentionally not granted (client uses copy+remove instead).
+-- ----------------------------------------------------------------------

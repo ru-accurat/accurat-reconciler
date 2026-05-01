@@ -45,16 +45,32 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
 
   save: async () => {
     const { categories } = get()
-    await supabase
-      .from('app_data')
-      .upsert({ key: 'categories', value: { version: 1, lastModified: new Date().toISOString(), categories } })
+    if (categories.length === 0) return
+    // Two-pass write because of self-referential parent_id FK.
+    const roots    = categories.filter((c) => !c.parentId)
+    const children = categories.filter((c) =>  c.parentId)
+    const toRow = (c: Category) => ({
+      id: c.id, name: c.name, color: c.color,
+      parent_id: c.parentId ?? null, is_default: !!c.isDefault,
+    })
+    const { error: rErr } = await supabase.from('categories').upsert(roots.map(toRow), { onConflict: 'id' })
+    if (rErr) { console.error('categoryStore.save (roots) failed:', rErr); throw rErr }
+    if (children.length > 0) {
+      const { error: cErr } = await supabase.from('categories').upsert(children.map(toRow), { onConflict: 'id' })
+      if (cErr) { console.error('categoryStore.save (children) failed:', cErr); throw cErr }
+    }
   },
 
   load: async () => {
     set({ isLoading: true })
     try {
-      const { data } = await supabase.from('app_data').select('value').eq('key', 'categories').single()
-      if (data?.value?.categories) set({ categories: data.value.categories })
+      const { data, error } = await supabase.from('categories').select('*')
+      if (error) { console.error('categoryStore.load failed:', error); return }
+      const categories: Category[] = (data ?? []).map((r: any) => ({
+        id: r.id, name: r.name, color: r.color,
+        parentId: r.parent_id ?? null, isDefault: !!r.is_default,
+      }))
+      set({ categories })
     } finally {
       set({ isLoading: false })
     }

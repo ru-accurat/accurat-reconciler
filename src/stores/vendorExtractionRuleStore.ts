@@ -37,16 +37,30 @@ export const useVendorExtractionRuleStore = create<VendorExtractionRuleState>((s
 
   save: async () => {
     const { rules } = get()
-    await supabase
-      .from('app_data')
-      .upsert({ key: 'vendorExtractionRules', value: { version: 1, lastModified: new Date().toISOString(), vendorExtractionRules: rules } })
+    if (rules.length === 0) return
+    const rows = rules.map((r) => ({
+      id: r.id,
+      vendor_normalized: r.vendorNormalized,
+      field: r.field,
+      label: r.label,
+      evidence: r.evidence,
+    }))
+    const { error } = await supabase
+      .from('vendor_extraction_rules')
+      .upsert(rows, { onConflict: 'id' })
+    if (error) { console.error('vendorExtractionRuleStore.save failed:', error); throw error }
   },
 
   load: async () => {
-    const { data } = await supabase.from('app_data').select('value').eq('key', 'vendorExtractionRules').single()
-    // Fall back to the legacy 'rules' inner key for any row that hasn't
-    // been re-saved under the new schema yet (Phase 0 rename window).
-    const items = data?.value?.vendorExtractionRules ?? data?.value?.rules
-    if (Array.isArray(items)) set({ rules: items })
+    const { data, error } = await supabase.from('vendor_extraction_rules').select('*')
+    if (error) { console.error('vendorExtractionRuleStore.load failed:', error); return }
+    const rules = (data ?? []).map((r: any) => ({
+      id: r.id,
+      vendorNormalized: r.vendor_normalized,
+      field: r.field,
+      label: r.label,
+      evidence: Array.isArray(r.evidence) ? r.evidence : [],
+    }))
+    set({ rules })
   },
 }))
