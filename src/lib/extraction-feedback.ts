@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { DocumentRecord, Transaction } from '@/lib/types'
 import { normalizeVendor } from '@/lib/invoice-template'
 
-export type ExtractionField = 'amount' | 'date'
+export type ExtractionField = 'amount' | 'date' | 'vendor'
 
 export interface VendorExtractionRule {
   id: string

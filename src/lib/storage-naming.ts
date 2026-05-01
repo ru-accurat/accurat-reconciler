@@ -20,6 +20,13 @@ import type { DocumentRecord } from '@/lib/types'
 export interface SemanticContext {
   /** Resolved category name for the doc's match (if any). */
   category?: string | null
+  /**
+   * Resolved client/vendor display name from the matched transaction's
+   * contact.  When present, this is preferred over `doc.extractedVendor`
+   * for the filename — the user-facing contact name is canonical, the
+   * extracted vendor is whatever the PDF parser pulled out.
+   */
+  contactName?: string | null
 }
 
 export function buildSemanticPath(doc: DocumentRecord, ctx: SemanticContext = {}): string {
@@ -32,7 +39,10 @@ export function buildSemanticPath(doc: DocumentRecord, ctx: SemanticContext = {}
   const dayKey = m ? `${m[1]}-${m[2]}-${m[3]}` : 'unknown-date'
 
   const folder   = m ? `${year}/${month}` : 'unknown-date'
-  const vendor   = slugifyStem(doc.extractedVendor ?? '', 40) || 'unknown-vendor'
+  // Prefer the matched contact's name over extractedVendor so the file
+  // name lines up with what the user sees in the UI for that contact.
+  const vendorRaw = ctx.contactName?.trim() || doc.extractedVendor || ''
+  const vendor   = slugifyStem(vendorRaw, 40) || 'unknown-vendor'
   const category = slugifyStem(ctx.category ?? '', 30) || 'uncategorized'
   const dir      = doc.direction || 'incoming'
 

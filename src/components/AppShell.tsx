@@ -99,29 +99,42 @@ export default function AppShell() {
     const seenSignatures = new Map<string, string>()
     let hydrated = false
 
-    const resolveCategoryName = (docId: string): string | null => {
+    // Resolve the matched-txn driven context (category + contact name) so
+    // the rename signature picks them up.  Returning null for either means
+    // the filename uses fallback values (uncategorized / extractedVendor).
+    const resolveCtx = (docId: string): { category: string | null; contactName: string | null } => {
       const doc = useDocumentStore.getState().documents.find((d) => d.id === docId)
-      if (!doc) return null
+      if (!doc) return { category: null, contactName: null }
       const txns = useTransactionStore.getState().transactions
       const cats = useCategoryStore.getState().categories
-      const matched = (doc.matchedTransactionIds ?? [])
-        .map((tid) => txns.find((t) => t.id === tid))
-        .find((t) => t?.categoryId)
-      if (!matched?.categoryId) return null
-      return cats.find((c) => c.id === matched.categoryId)?.name ?? null
+      const contacts = useContactStore.getState().contacts
+      let category: string | null = null
+      let contactName: string | null = null
+      for (const tid of doc.matchedTransactionIds ?? []) {
+        const t = txns.find((x) => x.id === tid)
+        if (!t) continue
+        if (!category && t.categoryId) {
+          category = cats.find((c) => c.id === t.categoryId)?.name ?? null
+        }
+        if (!contactName && t.contactId) {
+          contactName = contacts.find((c) => c.id === t.contactId)?.name ?? null
+        }
+        if (category && contactName) break
+      }
+      return { category, contactName }
     }
 
     const reconcile = () => {
       const docs = useDocumentStore.getState().documents
       if (!hydrated) {
         for (const d of docs) {
-          seenSignatures.set(d.id, renameSignature(d, { category: resolveCategoryName(d.id) }))
+          seenSignatures.set(d.id, renameSignature(d, resolveCtx(d.id)))
         }
         hydrated = true
         return
       }
       for (const doc of docs) {
-        const ctx = { category: resolveCategoryName(doc.id) }
+        const ctx = resolveCtx(doc.id)
         const prev = seenSignatures.get(doc.id)
         const next = renameSignature(doc, ctx)
         seenSignatures.set(doc.id, next)
@@ -143,6 +156,7 @@ export default function AppShell() {
       useDocumentStore.subscribe(reconcile),
       useTransactionStore.subscribe(reconcile),
       useCategoryStore.subscribe(reconcile),
+      useContactStore.subscribe(reconcile),
     ]
     return () => unsubs.forEach((u) => u())
   }, [])

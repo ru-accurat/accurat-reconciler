@@ -88,5 +88,6 @@ export function renameSignature(doc: DocumentRecord, ctx: SemanticContext = {}):
     doc.direction ?? '',
     doc.originalFilename ?? '',
     ctx.category ?? '',
+    ctx.contactName ?? '',
   ].join('|')
 }

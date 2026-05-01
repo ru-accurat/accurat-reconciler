@@ -91,17 +91,25 @@ interface PdfTask {
 function buildPdfPlan(input: BundleInput): PdfTask[] {
   const tasks: PdfTask[] = []
   const categoryById = new Map(input.categories.map(c => [c.id, c]))
+  const contactById  = new Map(input.contacts.map(c => [c.id, c]))
   const txnById      = new Map(input.transactions.map(t => [t.id, t]))
 
   for (const d of input.documents) {
     // Compute the storage path from doc fields rather than trusting
     // d.storedPath — the DB column can drift relative to actual storage
     // when an external rename runs concurrently with a browser auto-save.
-    // The semantic path is deterministic from (date, vendor, direction,
-    // category) so we just rebuild it here.
-    const matchedTxn = (d.matchedTransactionIds ?? []).map(id => txnById.get(id)).find(t => t?.categoryId)
-    const categoryName = matchedTxn?.categoryId ? categoryById.get(matchedTxn.categoryId)?.name ?? null : null
-    const computed = buildSemanticPath(d, { category: categoryName })
+    // Resolve category + contact name from the matched transaction (first
+    // one with the relevant fk wins; both can come from different txns).
+    let categoryName: string | null = null
+    let contactName: string | null = null
+    for (const tid of d.matchedTransactionIds ?? []) {
+      const t = txnById.get(tid)
+      if (!t) continue
+      if (!categoryName && t.categoryId) categoryName = categoryById.get(t.categoryId)?.name ?? null
+      if (!contactName  && t.contactId)  contactName  = contactById.get(t.contactId)?.name   ?? null
+      if (categoryName && contactName) break
+    }
+    const computed = buildSemanticPath(d, { category: categoryName, contactName })
     const monthFolder = monthSlugFor(d.extractedDate)
     const filename = computed.split('/').pop() ?? d.originalFilename
     tasks.push({

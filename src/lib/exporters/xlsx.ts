@@ -175,9 +175,16 @@ function buildDocumentsSheet(
     // Compute the filename from doc fields rather than reading d.storedPath —
     // the column can drift relative to actual storage during a concurrent
     // rename + auto-save race.  buildSemanticPath is deterministic.
-    const matchedTxnWithCat = (d.matchedTransactionIds ?? []).map(id => txnById.get(id)).find(t => t?.categoryId)
-    const categoryName = matchedTxnWithCat?.categoryId ? categoryById.get(matchedTxnWithCat.categoryId)?.name ?? null : null
-    const computedPath = buildSemanticPath(d, { category: categoryName })
+    let categoryName: string | null = null
+    let contactNameForPath: string | null = null
+    for (const tid of d.matchedTransactionIds ?? []) {
+      const t = txnById.get(tid)
+      if (!t) continue
+      if (!categoryName && t.categoryId) categoryName = categoryById.get(t.categoryId)?.name ?? null
+      if (!contactNameForPath && t.contactId) contactNameForPath = contactById.get(t.contactId)?.name ?? null
+      if (categoryName && contactNameForPath) break
+    }
+    const computedPath = buildSemanticPath(d, { category: categoryName, contactName: contactNameForPath })
     const filename = computedPath.split('/').pop() ?? computedPath
     const row = ws.addRow({
       date:      d.extractedDate ?? '',

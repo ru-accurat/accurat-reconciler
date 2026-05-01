@@ -1,9 +1,10 @@
 'use client'
-import React, { useState, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import {
   FileText, File, Check, AlertCircle, Link, Unlink,
   X, Trash2, ArrowUpDown, LayoutGrid, List,
-  ArrowDownCircle, ArrowUpCircle, Search, Upload, Download, Eye, Loader2, Wand2
+  ArrowDownCircle, ArrowUpCircle, Search, Upload, Download, Eye, Loader2, Wand2,
+  Pencil
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDocumentStore } from '@/stores/documentStore'
@@ -16,14 +17,31 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useUIStore } from '@/stores/uiStore'
 import { formatCurrency, formatDate } from '@/lib/formatters'
 import { matchDocument, isAutoMatch, findAutoMatchIds, updateContactFromEntities } from '@/lib/document-matcher'
-import { computeSignature } from '@/lib/invoice-template'
-import { inferRulesFromMatch } from '@/lib/extraction-feedback'
+import { computeSignature, normalizeVendor as normalizeVendorForRule } from '@/lib/invoice-template'
+import { inferRulesFromMatch, extractLabelBefore } from '@/lib/extraction-feedback'
 import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import DocumentThumbnail from '@/components/documents/DocumentThumbnail'
 import { Transaction, DocumentRecord } from '@/lib/types'
 
-type FilterTab = 'all' | 'matched' | 'unmatched'
+type FilterTab = 'all' | 'matched' | 'unmatched' | 'needs-review'
+
+/**
+ * A doc needs manual review when one or more of its tag fields are
+ * missing — date, amount, or vendor.  These are the fields that drive
+ * matching and the semantic filename, so a missing one means the doc
+ * sits in `unknown-…` filename buckets and won't auto-match.
+ */
+function missingFields(d: { extractedDate: string | null; extractedAmount: number | null; extractedVendor: string | null }): Array<'date' | 'amount' | 'vendor'> {
+  const out: Array<'date' | 'amount' | 'vendor'> = []
+  if (!d.extractedDate) out.push('date')
+  if (d.extractedAmount === null || d.extractedAmount === undefined) out.push('amount')
+  if (!d.extractedVendor) out.push('vendor')
+  return out
+}
+function needsReview(d: { extractedDate: string | null; extractedAmount: number | null; extractedVendor: string | null }): boolean {
+  return missingFields(d).length > 0
+}
 type SortField = 'scannedAt' | 'extractedDate' | 'extractedAmount' | 'extractedVendor' | 'matchStatus'
 type ViewMode = 'list' | 'grid'
 
@@ -77,6 +95,7 @@ export default function DocumentsPage() {
     switch (filterTab) {
       case 'matched': result = result.filter(isDocMatched); break
       case 'unmatched': result = result.filter((d) => !isDocMatched(d)); break
+      case 'needs-review': result = result.filter(needsReview); break
     }
     if (filterDirection !== 'all') result = result.filter((d) => d.direction === filterDirection)
     if (globalSearch) {
@@ -105,8 +124,47 @@ export default function DocumentsPage() {
   const counts = useMemo(() => ({
     all: documents.length,
     matched: documents.filter(isDocMatched).length,
-    unmatched: documents.filter((d) => !isDocMatched(d)).length
+    unmatched: documents.filter((d) => !isDocMatched(d)).length,
+    needsReview: documents.filter(needsReview).length,
   }), [documents])
+
+  // Apply a manual edit to a single doc field.  For vendor edits, when
+  // the new value appears verbatim in the doc's extractedText, capture
+  // the preceding label as a vendor-extraction rule so future docs of the
+  // same shape auto-extract correctly (Phase D learning hook).
+  const addExtractionRules = useVendorExtractionRuleStore((s) => s.addRules)
+  const handleEditDocField = useCallback((docId: string, kind: DocFieldKind, next: string | number | null) => {
+    const before = documents.find((d) => d.id === docId)
+    if (!before) return
+    const updates: Partial<DocumentRecord> = {}
+    if (kind === 'vendor') updates.extractedVendor = (next as string | null) ?? null
+    else if (kind === 'amount') updates.extractedAmount = (next as number | null) ?? null
+    else if (kind === 'date')   updates.extractedDate   = (next as string | null) ?? null
+    updateDocument(docId, updates)
+    // Vendor learning — only when we have extractedText to scan and the new
+    // value can actually be located in it.  inferRulesFromMatch already
+    // does this for amount + date when a match is established; here we
+    // do it directly for vendor on user edit.
+    if (kind === 'vendor' && typeof next === 'string' && next.trim().length >= 3 && before.extractedText) {
+      const text = before.extractedText
+      const idx = text.toLowerCase().indexOf(next.trim().toLowerCase())
+      if (idx > 0) {
+        const label = extractLabelBefore(text, idx, 30)
+        const vendorNormalized = normalizeVendorForRule(next.trim())
+        if (label && vendorNormalized) {
+          addExtractionRules([{
+            id: crypto.randomUUID(),
+            vendorNormalized,
+            field: 'vendor',
+            label,
+            evidence: [{ docId, learnedAt: new Date().toISOString() }],
+          }])
+          toast.success(`Learned: "${label}" precedes vendor on this invoice type`, { duration: 4000 })
+          return
+        }
+      }
+    }
+  }, [documents, updateDocument, addExtractionRules])
 
   const getContactName = useCallback((contactId: string | null) => {
     if (!contactId) return null
@@ -178,6 +236,29 @@ export default function DocumentsPage() {
             }
             const res = await fetch('/api/pdf', { method: 'POST', body: formData })
             if (res.ok) extractedData = await res.json()
+
+            // Apply learned vendor-precedence labels: if extraction returned
+            // no/short vendor, scan extractedText for any active
+            // vendor-extraction rule's label and use the text that follows.
+            // Unlike amount/date rules these aren't keyed on vendor (we
+            // don't know it yet), so we apply ALL active vendor rules and
+            // take the first hit.
+            const ruleStoreState = useVendorExtractionRuleStore.getState()
+            const vendorLabels = ruleStoreState.rules
+              .filter((r) => r.field === 'vendor' && r.evidence.length >= 1)
+              .map((r) => r.label)
+            const vendorSuspicious = !extractedData.vendor || (extractedData.vendor.trim().length < 3)
+            if (vendorSuspicious && vendorLabels.length > 0 && extractedData.text) {
+              for (const label of vendorLabels) {
+                const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                const re = new RegExp(`${escaped}\\s*[:\\n]\\s*([^\\n]{2,80})`, 'i')
+                const m = re.exec(extractedData.text)
+                if (m && m[1].trim().length >= 2) {
+                  extractedData.vendor = m[1].trim()
+                  break
+                }
+              }
+            }
 
             // Second pass: if the extracted vendor has learned date/amount labels
             // AND the first-pass result is suspicious (null/missing), re-extract
@@ -456,7 +537,8 @@ export default function DocumentsPage() {
   const tabs: { key: FilterTab; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: counts.all },
     { key: 'matched', label: 'Matched', count: counts.matched },
-    { key: 'unmatched', label: 'Unmatched', count: counts.unmatched }
+    { key: 'unmatched', label: 'Unmatched', count: counts.unmatched },
+    { key: 'needs-review', label: 'Needs review', count: counts.needsReview }
   ]
 
   return (
@@ -586,9 +668,19 @@ export default function DocumentsPage() {
                     <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium ${matched ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                       {matched ? <Check size={10} /> : <AlertCircle size={10} />}{matched ? matchedTxns.length > 1 ? `Matched (${matchedTxns.length})` : 'Matched' : 'Unmatched'}
                     </span>
+                    {needsReview(doc) && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800" title={`Missing: ${missingFields(doc).join(', ')}`}>
+                        <AlertCircle size={10} />Needs review
+                      </span>
+                    )}
                   </div>
-                  {doc.extractedVendor && <p className="text-xs text-gray-500 truncate">{doc.extractedVendor}</p>}
-                  {doc.extractedAmount !== null && <p className="text-sm font-semibold text-gray-800">{formatCurrency(doc.extractedAmount)}</p>}
+                  <div className="text-xs space-y-0.5">
+                    <div className="truncate"><EditableDocField kind="vendor" value={doc.extractedVendor} onSave={(v) => handleEditDocField(doc.id, 'vendor', v)} /></div>
+                    <div className="flex gap-2">
+                      <EditableDocField kind="amount" value={doc.extractedAmount} onSave={(v) => handleEditDocField(doc.id, 'amount', v)} />
+                      <EditableDocField kind="date"   value={doc.extractedDate}   onSave={(v) => handleEditDocField(doc.id, 'date',   v)} />
+                    </div>
+                  </div>
                   <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-gray-100">
                     {matched ? (
                       <><button onClick={() => handleManualMatch(doc.id)} className="btn-secondary btn-sm text-xs flex-1" title="Add match"><Link size={12} /></button>
@@ -629,11 +721,16 @@ export default function DocumentsPage() {
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${matched ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                         {matched ? <Check size={12} /> : <AlertCircle size={12} />}{matched ? matchedTxns.length > 1 ? `Matched (${matchedTxns.length})` : 'Matched' : 'Unmatched'}
                       </span>
+                      {needsReview(doc) && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800" title={`Missing: ${missingFields(doc).join(', ')}`}>
+                          <AlertCircle size={12} />Needs review
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
-                      {doc.extractedVendor && <span>Vendor: <span className="text-gray-700">{doc.extractedVendor}</span></span>}
-                      {doc.extractedAmount !== null && <span>Amount: <span className="text-gray-700">{formatCurrency(doc.extractedAmount)}</span></span>}
-                      {doc.extractedDate && <span>Date: <span className="text-gray-700">{formatDate(doc.extractedDate)}</span></span>}
+                      <span>Vendor: <EditableDocField kind="vendor" value={doc.extractedVendor} onSave={(v) => handleEditDocField(doc.id, 'vendor', v)} /></span>
+                      <span>Amount: <EditableDocField kind="amount" value={doc.extractedAmount} onSave={(v) => handleEditDocField(doc.id, 'amount', v)} /></span>
+                      <span>Date: <EditableDocField kind="date" value={doc.extractedDate} onSave={(v) => handleEditDocField(doc.id, 'date', v)} /></span>
                       {doc.extractedInvoiceNumber && <span>Invoice #: <span className="text-gray-700">{doc.extractedInvoiceNumber}</span></span>}
                       <span className="text-xs text-gray-400">Scanned {formatDate(doc.scannedAt)}</span>
                     </div>
@@ -716,4 +813,105 @@ export default function DocumentsPage() {
       </Modal>
     </div>
   )
+}
+
+// ----------------------------------------------------------------------
+// Inline-editable field for a single doc tag (vendor / amount / date).
+// Click → input.  Enter / blur saves.  Escape cancels.  When the value
+// is missing, the placeholder advertises that the field needs filling.
+// ----------------------------------------------------------------------
+type DocFieldKind = 'vendor' | 'amount' | 'date'
+
+interface EditableDocFieldProps {
+  kind: DocFieldKind
+  value: string | number | null
+  onSave: (next: string | number | null) => void
+  /** Compact = inline; expanded = label + control on its own line. */
+  compact?: boolean
+}
+
+function EditableDocField({ kind, value, onSave, compact = true }: EditableDocFieldProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft]     = useState<string>(initialDraft(kind, value))
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (editing) {
+      setDraft(initialDraft(kind, value))
+      requestAnimationFrame(() => inputRef.current?.focus())
+    }
+  }, [editing, kind, value])
+
+  const isMissing = value === null || value === undefined || value === ''
+
+  const commit = () => {
+    const trimmed = draft.trim()
+    if (trimmed === '') {
+      onSave(null)
+    } else if (kind === 'amount') {
+      const n = parseFloat(trimmed)
+      onSave(Number.isFinite(n) ? n : null)
+    } else {
+      onSave(trimmed)
+    }
+    setEditing(false)
+  }
+  const cancel = () => { setDraft(initialDraft(kind, value)); setEditing(false) }
+
+  if (!editing) {
+    const display = isMissing
+      ? <span className="text-amber-700 italic">{`Set ${LABEL_BY_KIND[kind]}…`}</span>
+      : <span className="text-gray-700">{formatDisplay(kind, value)}</span>
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+        className={`group inline-flex items-center gap-1 text-left rounded px-1 -mx-1 hover:bg-[var(--c-gray-100)] transition-colors ${
+          isMissing ? 'border border-dashed border-amber-300 bg-amber-50/50' : ''
+        }`}
+        title={`Click to edit ${LABEL_BY_KIND[kind]}`}
+      >
+        {!compact && <span className="text-gray-500">{LABEL_BY_KIND[kind]}:</span>}
+        {display}
+        <Pencil size={10} className="text-gray-300 opacity-0 group-hover:opacity-100" />
+      </button>
+    )
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type={kind === 'amount' ? 'number' : kind === 'date' ? 'date' : 'text'}
+      step={kind === 'amount' ? '0.01' : undefined}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.preventDefault(); commit() }
+        else if (e.key === 'Escape') { e.preventDefault(); cancel() }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className="input-field text-sm"
+      style={{ width: kind === 'date' ? '11rem' : kind === 'amount' ? '7rem' : '14rem' }}
+      placeholder={LABEL_BY_KIND[kind]}
+    />
+  )
+}
+
+const LABEL_BY_KIND: Record<DocFieldKind, string> = {
+  vendor: 'vendor',
+  amount: 'amount',
+  date:   'date',
+}
+
+function initialDraft(kind: DocFieldKind, v: string | number | null): string {
+  if (v === null || v === undefined) return ''
+  if (kind === 'amount' && typeof v === 'number') return String(v)
+  return String(v)
+}
+function formatDisplay(kind: DocFieldKind, v: string | number | null): string {
+  if (v === null || v === undefined) return ''
+  if (kind === 'amount' && typeof v === 'number') return v.toFixed(2)
+  if (kind === 'date'   && typeof v === 'string') return v
+  return String(v)
 }

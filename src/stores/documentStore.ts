@@ -4,6 +4,7 @@ import { DocumentRecord } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useCategoryStore } from '@/stores/categoryStore'
+import { useContactStore } from '@/stores/contactStore'
 import { buildSemanticPath, buildSemanticThumbnailPath } from '@/lib/storage-naming'
 
 function stripNulDeep<T>(value: T): T {
@@ -177,21 +178,28 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         txnsByDoc.set(j.document_id, arr)
       }
       // For computing the storage path on the fly: resolve each doc's matched
-      // category from txn/category state.  documentStore.load may run before
-      // the transaction/category stores have hydrated; in that case we fall
-      // back to whatever stored_path is in the DB (and the rename hook will
-      // recompute later when category becomes available).
+      // category + contact name from txn/category/contact state.
+      // documentStore.load may run before the other stores have hydrated;
+      // in that case the AppShell rename subscription recomputes once they
+      // do.
       const txns = useTransactionStore.getState().transactions
       const cats = useCategoryStore.getState().categories
+      const contacts = useContactStore.getState().contacts
       const txnById = new Map(txns.map(t => [t.id, t]))
       const catById = new Map(cats.map(c => [c.id, c]))
-      const resolveCategory = (docId: string): string | null => {
+      const contactById = new Map(contacts.map(c => [c.id, c]))
+      const resolveCtx = (docId: string): { category: string | null; contactName: string | null } => {
         const tids = txnsByDoc.get(docId) ?? []
+        let category: string | null = null
+        let contactName: string | null = null
         for (const tid of tids) {
           const t = txnById.get(tid)
-          if (t?.categoryId) return catById.get(t.categoryId)?.name ?? null
+          if (!t) continue
+          if (!category && t.categoryId) category = catById.get(t.categoryId)?.name ?? null
+          if (!contactName && t.contactId) contactName = contactById.get(t.contactId)?.name ?? null
+          if (category && contactName) break
         }
-        return null
+        return { category, contactName }
       }
       const documents: DocumentRecord[] = (rows ?? []).map((r: any) => {
         const dbStoredPath: string = r.stored_path
@@ -223,7 +231,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           scannedAt: r.scanned_at,
         }
         if (dbStoredPath?.startsWith('pending/')) return transient
-        const ctx = { category: resolveCategory(r.id) }
+        const ctx = resolveCtx(r.id)
         const computed = buildSemanticPath(transient, ctx)
         const computedThumb = dbThumbPath ? buildSemanticThumbnailPath(transient, ctx) : null
         return { ...transient, storedPath: computed, thumbnailPath: computedThumb }
