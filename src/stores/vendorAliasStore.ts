@@ -56,13 +56,14 @@ export const useVendorAliasStore = create<VendorAliasState>((set, get) => ({
     const { aliases } = get()
     await supabase
       .from('app_data')
-      .upsert({ key: 'vendorAliases', value: { version: 1, lastModified: new Date().toISOString(), aliases } })
+      .upsert({ key: 'vendorAliases', value: { version: 1, lastModified: new Date().toISOString(), vendorAliases: aliases } })
   },
 
   load: async () => {
     const { data } = await supabase.from('app_data').select('value').eq('key', 'vendorAliases').single()
-    if (data?.value?.aliases) {
-      set({ aliases: data.value.aliases })
-    }
+    // Fall back to the legacy 'aliases' inner key for any row that hasn't
+    // been re-saved under the new schema yet (Phase 0 rename window).
+    const items = data?.value?.vendorAliases ?? data?.value?.aliases
+    if (Array.isArray(items)) set({ aliases: items })
   }
 }))

@@ -14,17 +14,21 @@ export async function POST() {
   if (!url || !key) return NextResponse.json({ error: 'Supabase env not set' }, { status: 500 })
   const supabase = createClient(url, key)
 
-  const fetchKey = async <T,>(k: string, field: string): Promise<T[]> => {
+  // Inner JSONB key now matches the outer row key (Phase 0 rename). The
+  // legacy fallback below covers rows that haven't been re-saved yet by the
+  // new client code — drops out of use once every store has run save() once.
+  const fetchKey = async <T,>(k: string, field: string, legacyField?: string): Promise<T[]> => {
     const { data } = await supabase.from('app_data').select('value').eq('key', k).single()
-    return (data?.value?.[field] ?? []) as T[]
+    const items = data?.value?.[field] ?? (legacyField ? data?.value?.[legacyField] : undefined)
+    return (items ?? []) as T[]
   }
 
   const [docs, transactions, contacts, vendorAliases, templates] = await Promise.all([
     fetchKey<DocumentRecord>('documents', 'documents'),
     fetchKey<Transaction>('transactions', 'transactions'),
     fetchKey<Contact>('contacts', 'contacts'),
-    fetchKey<VendorAlias>('vendorAliases', 'aliases'),
-    fetchKey<InvoiceTemplate>('invoiceTemplates', 'templates'),
+    fetchKey<VendorAlias>('vendorAliases', 'vendorAliases', 'aliases'),
+    fetchKey<InvoiceTemplate>('invoiceTemplates', 'invoiceTemplates', 'templates'),
   ])
 
   const claimedTxnIds = new Set<string>(docs.flatMap(d => d.matchedTransactionIds ?? []))

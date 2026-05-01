@@ -39,11 +39,14 @@ export const useVendorExtractionRuleStore = create<VendorExtractionRuleState>((s
     const { rules } = get()
     await supabase
       .from('app_data')
-      .upsert({ key: 'vendorExtractionRules', value: { version: 1, lastModified: new Date().toISOString(), rules } })
+      .upsert({ key: 'vendorExtractionRules', value: { version: 1, lastModified: new Date().toISOString(), vendorExtractionRules: rules } })
   },
 
   load: async () => {
     const { data } = await supabase.from('app_data').select('value').eq('key', 'vendorExtractionRules').single()
-    if (data?.value?.rules) set({ rules: data.value.rules })
+    // Fall back to the legacy 'rules' inner key for any row that hasn't
+    // been re-saved under the new schema yet (Phase 0 rename window).
+    const items = data?.value?.vendorExtractionRules ?? data?.value?.rules
+    if (Array.isArray(items)) set({ rules: items })
   },
 }))

@@ -48,13 +48,14 @@ export const useInvoiceTemplateStore = create<InvoiceTemplateState>((set, get) =
     const { templates } = get()
     await supabase
       .from('app_data')
-      .upsert({ key: 'invoiceTemplates', value: { version: 1, lastModified: new Date().toISOString(), templates } })
+      .upsert({ key: 'invoiceTemplates', value: { version: 1, lastModified: new Date().toISOString(), invoiceTemplates: templates } })
   },
 
   load: async () => {
     const { data } = await supabase.from('app_data').select('value').eq('key', 'invoiceTemplates').single()
-    if (data?.value?.templates) {
-      set({ templates: data.value.templates })
-    }
+    // Fall back to the legacy 'templates' inner key for any row that hasn't
+    // been re-saved under the new schema yet (Phase 0 rename window).
+    const items = data?.value?.invoiceTemplates ?? data?.value?.templates
+    if (Array.isArray(items)) set({ templates: items })
   },
 }))
