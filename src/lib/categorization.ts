@@ -65,6 +65,21 @@ export function applyContractPatterns(
   })
 }
 
+const TAX_CATEGORY_ID = 'cat-024'
+
+/**
+ * For any unreconciled transaction already categorised as Tax (cat-024),
+ * flip its status to 'tax'. Mirrors the contract-pattern mechanism so tax
+ * payments are visually distinct without needing a separate import-time hook.
+ */
+export function applyTaxStatus(transactions: Transaction[]): Transaction[] {
+  return transactions.map((txn) => {
+    if (txn.status !== 'unreconciled') return txn
+    if (txn.categoryId !== TAX_CATEGORY_ID) return txn
+    return { ...txn, status: 'tax' as const }
+  })
+}
+
 export function suggestPattern(description: string): string {
   const parts = description.split(':')
   let pattern = parts[0].trim()

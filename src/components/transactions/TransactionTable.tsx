@@ -73,7 +73,8 @@ export default function TransactionTable() {
     { value: 'unreconciled', label: 'Unreconciled', color: '#f59e0b' },
     { value: 'reconciled', label: 'Reconciled', color: '#10b981' },
     { value: 'flagged', label: 'Flagged', color: '#ef4444' },
-    { value: 'contract', label: 'Contract', color: '#6366f1' }
+    { value: 'contract', label: 'Contract', color: '#6366f1' },
+    { value: 'tax', label: 'Tax', color: '#f97316' }
   ]
 
   const handleCategoryChange = (transactionId: string, categoryId: string | null) => {
@@ -174,7 +175,8 @@ export default function TransactionTable() {
                 reconciled: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
                 unreconciled: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
                 flagged: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                contract: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                contract: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+                tax: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
               }
               return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[opt.value] || ''}`}>{opt.label}</span>
             }} />
@@ -239,7 +241,7 @@ export default function TransactionTable() {
             </thead>
             <tbody>
               {table.getRowModel().rows.map((row) => {
-                const borderColor = row.original.status === 'reconciled' ? 'border-l-emerald-500' : row.original.status === 'flagged' ? 'border-l-red-500' : row.original.status === 'contract' ? 'border-l-indigo-500' : 'border-l-amber-500'
+                const borderColor = row.original.status === 'reconciled' ? 'border-l-emerald-500' : row.original.status === 'flagged' ? 'border-l-red-500' : row.original.status === 'contract' ? 'border-l-indigo-500' : row.original.status === 'tax' ? 'border-l-orange-500' : 'border-l-amber-500'
                 const isExpanded = expandedId === row.original.id
                 return (
                   <React.Fragment key={row.id}>

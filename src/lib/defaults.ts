@@ -22,6 +22,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat-021', name: 'Rent', color: '#78716C', parentId: 'cat-010', isDefault: true },
   { id: 'cat-022', name: 'Healthcare', color: '#DC2626', parentId: 'cat-010', isDefault: true },
   { id: 'cat-023', name: 'Other Expenses', color: '#9CA3AF', parentId: 'cat-010', isDefault: true },
+  { id: 'cat-024', name: 'Tax', color: '#F97316', parentId: 'cat-010', isDefault: true },
   // Transfers & Payroll
   { id: 'cat-030', name: 'Transfers', color: '#64748B', parentId: null, isDefault: true },
   { id: 'cat-031', name: 'Payroll', color: '#475569', parentId: null, isDefault: true },
@@ -64,6 +65,8 @@ export const SEED_CONTACTS: Contact[] = [
   { id: 'con-040', name: 'Kirti Randmaa', legalEntityName: '', type: 'service', vatTaxId: '', address: '', email: '', phone: '', notes: 'Cleaning service', transactionPatterns: ['KIRTI'], source: 'manual', createdAt: now, updatedAt: now },
   { id: 'con-041', name: 'Ciaovino', legalEntityName: 'Ciaovino', type: 'service', vatTaxId: '', address: '', email: '', phone: '', notes: 'Catering service', transactionPatterns: ['CIAOVINO'], source: 'manual', createdAt: now, updatedAt: now },
   { id: 'con-042', name: 'Beatrice', legalEntityName: '', type: 'service', vatTaxId: '', address: '', email: '', phone: '', notes: '', transactionPatterns: ['BEATRICE'], source: 'manual', createdAt: now, updatedAt: now },
+  { id: 'con-043', name: 'IRS', legalEntityName: 'Internal Revenue Service', type: 'vendor', vatTaxId: '', address: '', email: '', phone: '', notes: 'Federal tax authority', transactionPatterns: ['IRS'], source: 'manual', createdAt: now, updatedAt: now },
+  { id: 'con-044', name: 'NYC Dept Tax', legalEntityName: 'NYC Department of Finance', type: 'vendor', vatTaxId: '', address: '', email: '', phone: '', notes: 'NYC tax authority', transactionPatterns: ['NYC DEPT TAX', 'NYC DOF', 'NYC DEPT OF TAX'], source: 'manual', createdAt: now, updatedAt: now },
 ]
 
 // ============ SEED RULES ============
@@ -83,7 +86,7 @@ export function generateSeedRules(contacts: Contact[], categories: Category[]): 
     'con-032': 'cat-018', 'con-033': 'cat-014', 'con-034': 'cat-017',
     'con-035': 'cat-021', 'con-036': 'cat-015', 'con-037': 'cat-004',
     'con-038': 'cat-023', 'con-040': 'cat-017', 'con-041': 'cat-019',
-    'con-042': 'cat-023',
+    'con-042': 'cat-023', 'con-043': 'cat-024', 'con-044': 'cat-024',
   }
 
   for (const contact of contacts) {

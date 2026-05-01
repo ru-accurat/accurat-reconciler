@@ -10,7 +10,7 @@ export interface Transaction {
   categoryId: string | null
   billingPeriod: { month: number; year: number } | null
   billingPeriodOverride: boolean
-  status: 'unreconciled' | 'reconciled' | 'flagged' | 'contract'
+  status: 'unreconciled' | 'reconciled' | 'flagged' | 'contract' | 'tax'
   documentIds: string[]
   splitParts: SplitPart[] | null
   notes: string

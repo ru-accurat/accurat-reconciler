@@ -4,7 +4,7 @@ export interface TransactionFilters {
   search: string
   dateFrom: string
   dateTo: string
-  status: 'all' | 'unreconciled' | 'reconciled' | 'flagged' | 'contract'
+  status: 'all' | 'unreconciled' | 'reconciled' | 'flagged' | 'contract' | 'tax'
   categoryIds: string[]
   contactIds: string[]
   amountMin: string

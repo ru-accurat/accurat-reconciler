@@ -1,6 +1,6 @@
 'use client'
 import React, { useState } from 'react'
-import { Tags, Users, Flag, CheckCircle, XCircle, X, FileSignature } from 'lucide-react'
+import { Tags, Users, Flag, CheckCircle, XCircle, X, FileSignature, Receipt } from 'lucide-react'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useContactStore } from '@/stores/contactStore'
 import { useCategoryStore } from '@/stores/categoryStore'
@@ -33,7 +33,7 @@ export default function BulkActionsBar() {
     toast.success(`Contact set for ${count} transactions`)
   }
 
-  const handleSetStatus = (status: 'unreconciled' | 'reconciled' | 'flagged' | 'contract') => {
+  const handleSetStatus = (status: 'unreconciled' | 'reconciled' | 'flagged' | 'contract' | 'tax') => {
     bulkUpdateTransactions(selectedTransactionIds, { status })
     toast.success(`${count} transactions marked as ${status}`)
   }
@@ -137,6 +137,13 @@ export default function BulkActionsBar() {
       >
         <FileSignature size={14} />
         Contract
+      </button>
+      <button
+        onClick={() => handleSetStatus('tax')}
+        className="btn-ghost btn-sm flex items-center gap-1.5 text-sm text-orange-600"
+      >
+        <Receipt size={14} />
+        Tax
       </button>
 
       <button onClick={clearSelection} className="ml-auto btn-ghost btn-sm text-gray-400 hover:text-gray-600">

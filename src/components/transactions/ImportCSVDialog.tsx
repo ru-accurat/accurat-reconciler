@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useRuleStore } from '@/stores/ruleStore'
 import { useUIStore } from '@/stores/uiStore'
-import { applyRulesToTransactions, applyContractPatterns } from '@/lib/categorization'
+import { applyRulesToTransactions, applyContractPatterns, applyTaxStatus } from '@/lib/categorization'
 import { useCategoryStore } from '@/stores/categoryStore'
 import { useContactStore } from '@/stores/contactStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -68,7 +68,8 @@ export default function ImportCSVDialog() {
         const allTransactions = useTransactionStore.getState().transactions
         const categorized = applyRulesToTransactions(allTransactions, rules, contacts)
         const withContracts = applyContractPatterns(categorized, contractPatterns || [])
-        setTransactions(withContracts)
+        const withTax = applyTaxStatus(withContracts)
+        setTransactions(withTax)
       }
 
       // Auto-save
