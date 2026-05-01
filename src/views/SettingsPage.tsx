@@ -1,20 +1,19 @@
 'use client'
 import React, { useState } from 'react'
-import { Palette, FileInput, Info, Building2, Save, Plus, X, List, FileSignature } from 'lucide-react'
+import { FileInput, Info, Building2, Save, Plus, X, List, FileSignature } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/stores/settingsStore'
 
-type TabId = 'business' | 'appearance' | 'import' | 'patterns'
+type TabId = 'business' | 'import' | 'patterns'
 
 const TABS: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = [
-  { id: 'business',   label: 'Business',   icon: Building2 },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'import',     label: 'Import',     icon: FileInput },
-  { id: 'patterns',   label: 'Patterns',   icon: List },
+  { id: 'business', label: 'Business', icon: Building2 },
+  { id: 'import',   label: 'Import',   icon: FileInput },
+  { id: 'patterns', label: 'Patterns', icon: List },
 ]
 
 export default function SettingsPage() {
-  const { settings, updateSettings, setTheme, save } = useSettingsStore()
+  const { settings, updateSettings, save } = useSettingsStore()
   const [activeTab, setActiveTab] = useState<TabId>('business')
   const [newLabel, setNewLabel] = useState('')
   const [newContractPattern, setNewContractPattern] = useState('')
@@ -33,8 +32,8 @@ export default function SettingsPage() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Configure application preferences</p>
+          <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
+          <p className="text-sm text-gray-600 mt-1">Configure application preferences</p>
         </div>
         <button onClick={handleSave} className="btn-primary flex items-center gap-2">
           <Save size={16} />
@@ -43,7 +42,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab strip */}
-      <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+      <div className="flex border-b border-gray-200 mb-6">
         {TABS.map((tab) => {
           const Icon = tab.icon
           const active = activeTab === tab.id
@@ -53,8 +52,8 @@ export default function SettingsPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 active
-                  ? 'border-primary-600 text-primary-600 dark:text-primary-400'
-                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                  ? 'border-[var(--c-gray-900)] text-[var(--c-gray-900)]'
+                  : 'border-transparent text-gray-600 hover:text-gray-100'
               }`}
             >
               <Icon size={15} />
@@ -67,16 +66,16 @@ export default function SettingsPage() {
       {activeTab === 'business' && (
         <div className="space-y-6">
           <section className="card p-6">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Business info</h3>
+            <h3 className="font-semibold text-gray-900 mb-4">Business info</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Business Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
                 <input type="text" value={settings.businessName}
                   onChange={(e) => updateSettings({ businessName: e.target.value })}
                   placeholder="Your Business Name" className="input-field text-sm" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tax ID (EIN)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tax ID (EIN)</label>
                 <input type="text" value={settings.businessTaxId}
                   onChange={(e) => updateSettings({ businessTaxId: e.target.value })}
                   placeholder="XX-XXXXXXX" className="input-field text-sm" />
@@ -86,57 +85,39 @@ export default function SettingsPage() {
 
           <section className="card p-6">
             <div className="flex items-center gap-2 mb-4">
-              <Info size={18} className="text-primary-600" />
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">About</h3>
+              <Info size={18} className="text-[var(--c-gray-900)]" />
+              <h3 className="font-semibold text-gray-900">About</h3>
             </div>
-            <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center justify-between">
                 <span>App Version</span>
-                <span className="font-medium text-gray-900 dark:text-gray-100">1.0.0</span>
+                <span className="font-medium text-gray-900">1.0.0</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>Built with</span>
-                <span className="font-medium text-gray-900 dark:text-gray-100">Next.js + React + TypeScript</span>
+                <span className="font-medium text-gray-900">Next.js + React + TypeScript</span>
               </div>
               <div className="flex items-center justify-between">
                 <span>Database</span>
-                <span className="font-medium text-gray-900 dark:text-gray-100">Supabase</span>
+                <span className="font-medium text-gray-900">Supabase</span>
               </div>
             </div>
           </section>
         </div>
       )}
 
-      {activeTab === 'appearance' && (
-        <section className="card p-6">
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Theme</h3>
-          <div className="flex gap-2">
-            {(['light', 'dark', 'system'] as const).map((theme) => (
-              <button key={theme} onClick={() => setTheme(theme)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors capitalize ${
-                  settings.theme === theme
-                    ? 'bg-primary-600 text-white border-primary-600'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}>
-                {theme}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
       {activeTab === 'import' && (
         <section className="card p-6">
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">CSV import</h3>
+          <h3 className="font-semibold text-gray-900 mb-4">CSV import</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Bank Format</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Default Bank Format</label>
               <select value={settings.defaultBank} onChange={(e) => updateSettings({ defaultBank: e.target.value as 'chase' })} className="input-field text-sm">
                 <option value="chase">Chase</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date Format</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date Format</label>
               <select value={settings.csvDateFormat} onChange={(e) => updateSettings({ csvDateFormat: e.target.value })} className="input-field text-sm">
                 <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                 <option value="DD/MM/YYYY">DD/MM/YYYY</option>
@@ -151,19 +132,19 @@ export default function SettingsPage() {
         <div className="space-y-6">
           <section className="card p-6">
             <div className="flex items-center gap-2 mb-2">
-              <List size={18} className="text-primary-600" />
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">PDF amount-extraction labels</h3>
+              <List size={18} className="text-[var(--c-gray-900)]" />
+              <h3 className="font-semibold text-gray-900">PDF amount-extraction labels</h3>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm text-gray-600 mb-4">
               Custom text labels the PDF scanner looks for when extracting amounts from documents.
               These have the highest priority during extraction.
             </p>
             <div className="space-y-2 mb-4">
               {(settings.customAmountLabels || []).map((label, index) => (
-                <div key={index} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-                  <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 font-mono truncate">{label}</span>
+                <div key={index} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-gray-700 flex-1 font-mono truncate">{label}</span>
                   <button onClick={() => { const updated = (settings.customAmountLabels || []).filter((_, i) => i !== index); updateSettings({ customAmountLabels: updated }) }}
-                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 hover:text-red-500 transition-colors flex-shrink-0" title="Remove label">
+                    className="p-1 hover:bg-red-900/30 rounded text-gray-400 hover transition-colors flex-shrink-0" title="Remove label">
                     <X size={14} />
                   </button>
                 </div>
@@ -181,19 +162,19 @@ export default function SettingsPage() {
 
           <section className="card p-6">
             <div className="flex items-center gap-2 mb-2">
-              <FileSignature size={18} className="text-primary-600" />
-              <h3 className="font-semibold text-gray-900 dark:text-gray-100">Contract patterns</h3>
+              <FileSignature size={18} className="text-[var(--c-gray-900)]" />
+              <h3 className="font-semibold text-gray-900">Contract patterns</h3>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm text-gray-600 mb-4">
               Transaction descriptions containing any of these strings will automatically be
               labeled with the &quot;Contract&quot; status when imported. Matching is case-insensitive.
             </p>
             <div className="space-y-2 mb-4">
               {(settings.contractPatterns || []).map((pattern, index) => (
-                <div key={index} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-                  <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 font-mono truncate">{pattern}</span>
+                <div key={index} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                  <span className="text-sm text-gray-700 flex-1 font-mono truncate">{pattern}</span>
                   <button onClick={() => { const updated = (settings.contractPatterns || []).filter((_, i) => i !== index); updateSettings({ contractPatterns: updated }) }}
-                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 hover:text-red-500 transition-colors flex-shrink-0" title="Remove pattern">
+                    className="p-1 hover:bg-red-900/30 rounded text-gray-400 hover transition-colors flex-shrink-0" title="Remove pattern">
                     <X size={14} />
                   </button>
                 </div>

@@ -35,24 +35,24 @@ export default function MonthYearPicker({ value, onChange, placeholder = '—' }
           setIsOpen(!isOpen)
           if (!isOpen && value) setViewYear(value.year)
         }}
-        className="text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-1.5 py-0.5 transition-colors text-gray-600 dark:text-gray-400"
+        className="text-sm hover:bg-[var(--c-gray-100)] rounded px-1.5 py-0.5 transition-colors text-gray-600"
       >
         {displayValue}
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-52 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-3">
+        <div className="absolute z-50 mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-200 p-3">
           <div className="flex items-center justify-between mb-3">
             <button
               onClick={() => setViewYear((y) => y - 1)}
-              className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              className="p-0.5 hover:bg-[var(--c-gray-100)] rounded"
             >
               <ChevronLeft size={14} />
             </button>
             <span className="text-sm font-semibold">{viewYear}</span>
             <button
               onClick={() => setViewYear((y) => y + 1)}
-              className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              className="p-0.5 hover:bg-[var(--c-gray-100)] rounded"
             >
               <ChevronRight size={14} />
             </button>
@@ -71,8 +71,8 @@ export default function MonthYearPicker({ value, onChange, placeholder = '—' }
                   }}
                   className={`text-xs py-1.5 rounded transition-colors ${
                     isSelected
-                      ? 'bg-primary-600 text-white'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      ? 'bg-[var(--c-gray-900)] text-white'
+                      : 'hover:bg-[var(--c-gray-100)] text-gray-700'
                   }`}
                 >
                   {month}
@@ -88,7 +88,7 @@ export default function MonthYearPicker({ value, onChange, placeholder = '—' }
                 onChange(null)
                 setIsOpen(false)
               }}
-              className="w-full mt-2 text-xs text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1 py-1"
+              className="w-full mt-2 text-xs text-gray-400 hover flex items-center justify-center gap-1 py-1"
             >
               <X size={10} />
               Clear

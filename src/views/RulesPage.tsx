@@ -24,9 +24,9 @@ const MATCH_TYPE_LABELS: Record<MatchType, string> = {
 }
 
 const MATCH_TYPE_COLORS: Record<MatchType, string> = {
-  exact: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  contains: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  regex: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+  exact: 'bg-purple-100 text-purple-700',
+  contains: 'bg-blue-100 text-blue-700',
+  regex: 'bg-orange-100 text-orange-700'
 }
 
 interface RuleForm {
@@ -258,7 +258,7 @@ export default function RulesPage() {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Categorization Rules</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Categorization Rules</h2>
           <p className="text-sm text-gray-500 mt-1">Automatically categorize transactions based on patterns</p>
         </div>
         <div className="flex items-center gap-2">
@@ -280,7 +280,7 @@ export default function RulesPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-4">
         <div className="card p-3 text-center">
-          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{rules.length}</p>
+          <p className="text-2xl font-bold text-gray-900">{rules.length}</p>
           <p className="text-xs text-gray-500">Total Rules</p>
         </div>
         <div className="card p-3 text-center">
@@ -292,7 +292,7 @@ export default function RulesPage() {
           <p className="text-xs text-gray-500">Disabled</p>
         </div>
         <div className="card p-3 text-center">
-          <p className="text-2xl font-bold text-primary-600">{rules.reduce((sum, r) => sum + r.appliedCount, 0)}</p>
+          <p className="text-2xl font-bold text-[var(--c-gray-900)]">{rules.reduce((sum, r) => sum + r.appliedCount, 0)}</p>
           <p className="text-xs text-gray-500">Total Applied</p>
         </div>
       </div>
@@ -316,8 +316,8 @@ export default function RulesPage() {
               onClick={() => setFilterMatchType(type)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize ${
                 filterMatchType === type
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  ? 'bg-[var(--c-gray-900)] text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-[var(--c-gray-100)]'
               }`}
             >
               {type === 'all' ? 'All' : MATCH_TYPE_LABELS[type]}
@@ -330,14 +330,14 @@ export default function RulesPage() {
       <div className="card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+            <tr className="border-b border-gray-200 bg-gray-50">
               <th className="text-left px-4 py-3 font-medium text-gray-500">
-                <button onClick={() => handleSort('priority')} className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300">
+                <button onClick={() => handleSort('priority')} className="flex items-center gap-1 hover:text-gray-300">
                   <Hash size={12} /> Priority <ArrowUpDown size={10} />
                 </button>
               </th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">
-                <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300">
+                <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-gray-300">
                   Name <ArrowUpDown size={10} />
                 </button>
               </th>
@@ -346,7 +346,7 @@ export default function RulesPage() {
               <th className="text-left px-4 py-3 font-medium text-gray-500">Category</th>
               <th className="text-left px-4 py-3 font-medium text-gray-500">Contact</th>
               <th className="text-center px-4 py-3 font-medium text-gray-500">
-                <button onClick={() => handleSort('appliedCount')} className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300">
+                <button onClick={() => handleSort('appliedCount')} className="flex items-center gap-1 hover:text-gray-300">
                   Applied <ArrowUpDown size={10} />
                 </button>
               </th>
@@ -364,12 +364,12 @@ export default function RulesPage() {
               </tr>
             ) : (
               filteredRules.map((rule) => (
-                <tr key={rule.id} className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${!rule.enabled ? 'opacity-50' : ''}`}>
+                <tr key={rule.id} className={`border-b border-gray-100 hover:bg-[var(--c-gray-100)]/30 transition-colors ${!rule.enabled ? 'opacity-50' : ''}`}>
                   <td className="px-4 py-3 text-gray-400 font-mono text-xs">{rule.priority}</td>
                   <td className="px-4 py-3">
-                    <span className="font-medium text-gray-900 dark:text-gray-100">{rule.name}</span>
+                    <span className="font-medium text-gray-900">{rule.name}</span>
                     {rule.source === 'suggested' && (
-                      <span className="ml-1.5 text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded">suggested</span>
+                      <span className="ml-1.5 text-xs text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded">suggested</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -378,12 +378,12 @@ export default function RulesPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <code className="text-xs font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300 max-w-[200px] truncate inline-block">
+                    <code className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-700 max-w-[200px] truncate inline-block">
                       {rule.pattern}
                     </code>
                     {rule.caseSensitive && <span className="ml-1 text-xs text-gray-400" title="Case sensitive">Aa</span>}
                   </td>
-                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{getCategoryName(rule.categoryId)}</td>
+                  <td className="px-4 py-3 text-gray-700">{getCategoryName(rule.categoryId)}</td>
                   <td className="px-4 py-3 text-gray-500">{getContactName(rule.contactId) || '—'}</td>
                   <td className="px-4 py-3 text-center text-gray-500">{rule.appliedCount}</td>
                   <td className="px-4 py-3 text-center">
@@ -397,13 +397,13 @@ export default function RulesPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => openEdit(rule)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-400 hover:text-gray-600" title="Edit">
+                      <button onClick={() => openEdit(rule)} className="p-1.5 hover:bg-[var(--c-gray-100)] rounded text-gray-400 hover" title="Edit">
                         <Edit2 size={14} />
                       </button>
-                      <button onClick={() => duplicateRule(rule)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-400 hover:text-gray-600" title="Duplicate">
+                      <button onClick={() => duplicateRule(rule)} className="p-1.5 hover:bg-[var(--c-gray-100)] rounded text-gray-400 hover" title="Duplicate">
                         <Copy size={14} />
                       </button>
-                      <button onClick={() => handleDeleteClick(rule)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-gray-400 hover:text-red-500" title="Delete">
+                      <button onClick={() => handleDeleteClick(rule)} className="p-1.5 hover:bg-red-900/20 rounded text-gray-400 hover" title="Delete">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -420,7 +420,7 @@ export default function RulesPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
               <input
                 type="text"
                 value={form.name}
@@ -430,7 +430,7 @@ export default function RulesPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
               <input
                 type="number"
                 value={form.priority}
@@ -444,7 +444,7 @@ export default function RulesPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Match Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
               <select
                 value={form.matchType}
                 onChange={(e) => setForm({ ...form, matchType: e.target.value as MatchType })}
@@ -463,13 +463,13 @@ export default function RulesPage() {
                   onChange={(e) => setForm({ ...form, caseSensitive: e.target.checked })}
                   className="rounded border-gray-300"
                 />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Case sensitive</span>
+                <span className="text-sm text-gray-700">Case sensitive</span>
               </label>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pattern *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pattern *</label>
             <input
               type="text"
               value={form.pattern}
@@ -480,7 +480,7 @@ export default function RulesPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
             <select
               value={form.categoryId}
               onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
@@ -494,7 +494,7 @@ export default function RulesPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contact (optional)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Contact (optional)</label>
             <select
               value={form.contactId || ''}
               onChange={(e) => setForm({ ...form, contactId: e.target.value || null })}
@@ -508,8 +508,8 @@ export default function RulesPage() {
           </div>
 
           {/* Test Section */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Test Pattern</label>
+          <div className="border-t border-gray-200 pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Test Pattern</label>
             <div className="flex gap-2">
               <input
                 type="text"

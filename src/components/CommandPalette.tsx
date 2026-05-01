@@ -75,19 +75,19 @@ export default function CommandPalette() {
     <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 bg-black/50" onClick={close}>
       <Command
         label="Command Palette"
-        className="w-full max-w-xl bg-white dark:bg-gray-900 rounded-xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700"
+        className="w-full max-w-xl bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center px-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center px-3 border-b border-gray-200">
           <Search size={16} className="text-gray-400 mr-2" />
           <Command.Input
             value={query}
             onValueChange={setQuery}
             autoFocus
             placeholder="Type a command, or search transactions / docs / contacts…"
-            className="flex-1 py-3 bg-transparent outline-none text-sm placeholder:text-gray-400"
+            className="flex-1 py-3 bg-transparent outline-none text-sm placeholder"
           />
-          <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500">esc</kbd>
+          <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">esc</kbd>
         </div>
 
         <Command.List className="max-h-[60vh] overflow-y-auto py-2">
@@ -95,7 +95,7 @@ export default function CommandPalette() {
             No results.
           </Command.Empty>
 
-          <Command.Group heading="Navigation" className="px-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-gray-400 [&_[cmdk-group-heading]]:py-1">
+          <Command.Group heading="Navigation" className="px-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]] [&_[cmdk-group-heading]]:py-1">
             <PaletteItem icon={LayoutDashboard} label="Dashboard"     onSelect={() => goTo('dashboard')} />
             <PaletteItem icon={ArrowDownUp}     label="Transactions"  onSelect={() => goTo('transactions')} />
             <PaletteItem icon={FileText}        label="Documents"     onSelect={() => goTo('documents')} />
@@ -106,7 +106,7 @@ export default function CommandPalette() {
             <PaletteItem icon={Cog}             label="Settings"      onSelect={() => goTo('settings')} />
           </Command.Group>
 
-          <Command.Group heading="Actions" className="px-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-gray-400 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:mt-2">
+          <Command.Group heading="Actions" className="px-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]] [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:mt-2">
             <PaletteItem icon={Upload}    label="Import bank CSV…"  shortcut="⌘I"
               onSelect={() => { setShowImportDialog(true); close() }} />
             <PaletteItem icon={Wand2}     label="Auto-match documents"
@@ -116,7 +116,7 @@ export default function CommandPalette() {
           </Command.Group>
 
           {matchedTxns.length > 0 && (
-            <Command.Group heading="Transactions" className="px-2 mt-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-gray-400 [&_[cmdk-group-heading]]:py-1">
+            <Command.Group heading="Transactions" className="px-2 mt-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]] [&_[cmdk-group-heading]]:py-1">
               {matchedTxns.map(t => {
                 const cat = categories.find(c => c.id === t.categoryId)?.name ?? ''
                 const con = t.contactId ? contactById.get(t.contactId)?.name ?? '' : ''
@@ -133,7 +133,7 @@ export default function CommandPalette() {
           )}
 
           {matchedDocs.length > 0 && (
-            <Command.Group heading="Documents" className="px-2 mt-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-gray-400 [&_[cmdk-group-heading]]:py-1">
+            <Command.Group heading="Documents" className="px-2 mt-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]] [&_[cmdk-group-heading]]:py-1">
               {matchedDocs.map(d => (
                 <PaletteItem key={d.id}
                   icon={FileText}
@@ -146,7 +146,7 @@ export default function CommandPalette() {
           )}
 
           {matchedContacts.length > 0 && (
-            <Command.Group heading="Contacts" className="px-2 mt-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-gray-400 [&_[cmdk-group-heading]]:py-1">
+            <Command.Group heading="Contacts" className="px-2 mt-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]] [&_[cmdk-group-heading]]:py-1">
               {matchedContacts.map(c => (
                 <PaletteItem key={c.id}
                   icon={Users}
@@ -175,14 +175,14 @@ function PaletteItem({
   return (
     <Command.Item
       onSelect={onSelect}
-      className="flex items-center gap-3 px-2 py-2 rounded text-sm cursor-pointer aria-selected:bg-primary-50 dark:aria-selected:bg-primary-900/30 text-gray-800 dark:text-gray-200"
+      className="flex items-center gap-3 px-2 py-2 rounded text-sm cursor-pointer aria-selected:bg-[var(--c-gray-50)]:bg-[var(--c-gray-900)]/30 text-gray-800"
     >
       <Icon size={16} className="text-gray-400 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="truncate">{label}</div>
         {sublabel && <div className="text-[11px] text-gray-500 truncate">{sublabel}</div>}
       </div>
-      {shortcut && <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500">{shortcut}</kbd>}
+      {shortcut && <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{shortcut}</kbd>}
     </Command.Item>
   )
 }

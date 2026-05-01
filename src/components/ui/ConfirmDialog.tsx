@@ -18,10 +18,10 @@ export default function ConfirmDialog({ isOpen, onConfirm, onCancel, title, mess
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6">
+      <div className="relative bg-white rounded-xl shadow-xl max-w-sm w-full mx-4 p-6">
         <div className="flex items-start gap-3">
           {danger && (
-            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+            <div className="p-2 bg-red-100 rounded-full">
               <AlertTriangle size={20} className="text-red-600" />
             </div>
           )}

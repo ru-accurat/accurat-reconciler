@@ -62,7 +62,7 @@ export default function InlineSelect({
           e.stopPropagation()
           setIsOpen(!isOpen)
         }}
-        className="flex items-center gap-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-1.5 py-0.5 transition-colors min-w-0 max-w-full group"
+        className="flex items-center gap-1 text-sm hover:bg-[var(--c-gray-100)] rounded px-1.5 py-0.5 transition-colors min-w-0 max-w-full group"
       >
         {selected ? (
           renderValue ? (
@@ -77,11 +77,11 @@ export default function InlineSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 max-h-60 overflow-hidden flex flex-col"
+        <div className="absolute z-50 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 max-h-60 overflow-hidden flex flex-col"
           style={{ left: 0 }}
         >
           {searchable && (
-            <div className="px-2 py-1.5 border-b border-gray-100 dark:border-gray-700">
+            <div className="px-2 py-1.5 border-b border-gray-100">
               <div className="relative">
                 <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -90,7 +90,7 @@ export default function InlineSelect({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search..."
-                  className="w-full pl-7 pr-2 py-1 text-xs border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-900 outline-none focus:ring-1 focus:ring-primary-500"
+                  className="w-full pl-7 pr-2 py-1 text-xs border border-gray-200 rounded bg-gray-50 outline-none focus:ring-1 focus:ring-[var(--c-accent)]"
                 />
               </div>
             </div>
@@ -104,7 +104,7 @@ export default function InlineSelect({
                   setIsOpen(false)
                   setSearch('')
                 }}
-                className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-[var(--c-gray-100)] flex items-center gap-2"
               >
                 <X size={12} />
                 Clear
@@ -119,8 +119,8 @@ export default function InlineSelect({
                   setIsOpen(false)
                   setSearch('')
                 }}
-                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors ${
-                  option.value === value ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : ''
+                className={`w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--c-gray-100)] flex items-center gap-2 transition-colors ${
+                  option.value === value ? 'bg-[var(--c-gray-50)] text-[var(--c-gray-900)]' : ''
                 }`}
               >
                 {option.color && (

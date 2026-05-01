@@ -183,7 +183,7 @@ export default function TransactionTable() {
         const txn = row.original
         return (
           <div className="flex items-center gap-1.5">
-            {txn.documentIds.length > 0 && <span className="flex items-center gap-0.5 text-primary-600"><Paperclip size={13} /><span className="text-xs">{txn.documentIds.length}</span></span>}
+            {txn.documentIds.length > 0 && <span className="flex items-center gap-0.5 text-[var(--c-gray-900)]"><Paperclip size={13} /><span className="text-xs">{txn.documentIds.length}</span></span>}
             {txn.notes && <span title={txn.notes}><MessageSquare size={13} className="text-gray-400" /></span>}
             {txn.ruleIdApplied && <span title="Auto-categorized by rule"><Lightbulb size={13} className="text-amber-400" /></span>}
           </div>
@@ -196,7 +196,7 @@ export default function TransactionTable() {
       header: '',
       cell: ({ row }) => (
         <button onClick={(e) => { e.stopPropagation(); setExpandedId(expandedId === row.original.id ? null : row.original.id) }}
-          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors">
+          className="p-1 hover:bg-[var(--c-gray-100)] rounded transition-colors">
           {expandedId === row.original.id ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
         </button>
       ),
@@ -217,11 +217,11 @@ export default function TransactionTable() {
           <table className="w-full">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id} className="border-b border-gray-200 dark:border-gray-700">
+                <tr key={headerGroup.id} className="border-b border-gray-200">
                   {headerGroup.headers.map((header) => (
-                    <th key={header.id} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider" style={{ width: header.getSize() }}>
+                    <th key={header.id} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ width: header.getSize() }}>
                       {header.isPlaceholder ? null : (
-                        <button className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200" onClick={header.column.getToggleSortingHandler()}>
+                        <button className="flex items-center gap-1 hover:text-gray-200" onClick={header.column.getToggleSortingHandler()}>
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           {header.column.getCanSort() && <ArrowUpDown size={12} className="opacity-40" />}
                         </button>
@@ -237,7 +237,7 @@ export default function TransactionTable() {
                 const isExpanded = expandedId === row.original.id
                 return (
                   <React.Fragment key={row.id}>
-                    <tr className={`border-b border-gray-100 dark:border-gray-800 border-l-4 ${borderColor} hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer`}
+                    <tr className={`border-b border-gray-100 border-l-4 ${borderColor} hover:bg-[var(--c-gray-100)] transition-colors cursor-pointer`}
                       onClick={() => setExpandedId(isExpanded ? null : row.original.id)}>
                       {row.getVisibleCells().map((cell) => (
                         <td key={cell.id} className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
@@ -246,7 +246,7 @@ export default function TransactionTable() {
                       ))}
                     </tr>
                     {isExpanded && (
-                      <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30">
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
                         <td colSpan={columns.length} className="px-6 py-4">
                           <ExpandedRow transaction={row.original} editingNotes={editingNotes} setEditingNotes={setEditingNotes} updateTransaction={updateTransaction} />
                         </td>
@@ -265,9 +265,9 @@ export default function TransactionTable() {
             <p className="text-sm mt-1">Import a CSV file to get started</p>
           </div>
         )}
-        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-sm text-gray-600">
           <span>{filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}{selectedTransactionIds.length > 0 && ` (${selectedTransactionIds.length} selected)`}</span>
-          <span>Total: <span className="font-medium text-gray-900 dark:text-gray-100">{formatCurrency(filteredTransactions.reduce((sum, t) => sum + t.amount, 0))}</span></span>
+          <span>Total: <span className="font-medium text-gray-900">{formatCurrency(filteredTransactions.reduce((sum, t) => sum + t.amount, 0))}</span></span>
         </div>
       </div>
       <CreateRuleDialog isOpen={createRuleData.isOpen} onClose={() => setCreateRuleData((d) => ({ ...d, isOpen: false }))} transactionDescription={createRuleData.description} categoryId={createRuleData.categoryId} contactId={createRuleData.contactId} />
@@ -287,7 +287,7 @@ function ExpandedRow({ transaction, editingNotes, setEditingNotes, updateTransac
     <div className="grid grid-cols-3 gap-6">
       <div>
         <label className="text-xs font-medium text-gray-500 mb-1 block">Raw Description</label>
-        <p className="text-sm font-mono text-gray-600 dark:text-gray-400 break-all">{transaction.rawDescription}</p>
+        <p className="text-sm font-mono text-gray-600 break-all">{transaction.rawDescription}</p>
         <div className="mt-3 text-xs text-gray-400 space-y-1">
           <p>Imported: {new Date(transaction.importedAt).toLocaleDateString()}</p>
           <p>Updated: {new Date(transaction.updatedAt).toLocaleDateString()}</p>
@@ -313,7 +313,7 @@ function ExpandedRow({ transaction, editingNotes, setEditingNotes, updateTransac
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="text-xs font-medium text-gray-500 block">Documents</label>
-          <button onClick={() => setShowDocPicker(true)} className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
+          <button onClick={() => setShowDocPicker(true)} className="text-xs text-[var(--c-gray-900)] hover:text-[var(--c-gray-900)] flex items-center gap-1">
             <Plus size={12} />Match
           </button>
         </div>
@@ -368,13 +368,13 @@ function DocumentLinks({ documentIds, transactionId, updateTransaction }: { docu
         const url = doc ? getDocUrl(doc.storedPath) : null
         return (
           <div key={docId} className="flex items-center gap-2 text-sm group">
-            <Paperclip size={12} className="text-primary-600 flex-shrink-0" />
+            <Paperclip size={12} className="text-[var(--c-gray-900)] flex-shrink-0" />
             {url ? (
-              <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs truncate text-primary-600 hover:underline">{displayName}</a>
+              <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs truncate text-[var(--c-gray-900)] hover:underline">{displayName}</a>
             ) : (
-              <span className="text-xs truncate text-primary-600">{displayName}</span>
+              <span className="text-xs truncate text-[var(--c-gray-900)]">{displayName}</span>
             )}
-            <button onClick={() => handleUnlink(docId)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 hover:text-red-500 transition-all flex-shrink-0" title="Unlink">
+            <button onClick={() => handleUnlink(docId)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-900/30 rounded text-gray-400 hover transition-all flex-shrink-0" title="Unlink">
               <X size={10} />
             </button>
           </div>
@@ -460,8 +460,8 @@ function DocumentPickerDialog({ isOpen, onClose, transaction, updateTransaction 
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" placeholder="Search documents by name, vendor, invoice #..."
             value={search} onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" autoFocus />
-          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"><X size={14} /></button>}
+            className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-[var(--c-accent)] focus:border-[var(--c-gray-900)] outline-none" autoFocus />
+          {search && <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover"><X size={14} /></button>}
         </div>
         <div className="max-h-80 overflow-y-auto space-y-1">
           {availableDocs.length === 0 ? (
@@ -471,19 +471,19 @@ function DocumentPickerDialog({ isOpen, onClose, transaction, updateTransaction 
             const displayName = (() => { const parts = (doc.storedPath || doc.originalFilename).replace(/\\/g, '/').split('/'); return parts[parts.length - 1] || doc.originalFilename })()
             return (
               <button key={doc.id} onClick={() => toggleDoc(doc.id)}
-                className={`w-full text-left p-3 rounded-lg transition-colors border ${isSelected ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-600' : 'border-transparent hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-200 dark:hover:border-gray-600'}`}>
+                className={`w-full text-left p-3 rounded-lg transition-colors border ${isSelected ? 'bg-[var(--c-gray-50)] border-[var(--c-gray-200)]' : 'border-transparent hover:bg-[var(--c-gray-100)] hover:border-gray-600'}`}>
                 <div className="flex items-center gap-3">
-                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-primary-600 border-primary-600' : 'border-gray-300 dark:border-gray-600'}`}>
+                  <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-[var(--c-gray-900)] border-[var(--c-gray-900)]' : 'border-gray-300'}`}>
                     {isSelected && <Check size={10} className="text-white" />}
                   </div>
                   <FileText size={16} className="text-gray-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{displayName}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
                     <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
                       {doc.extractedVendor && <span>{doc.extractedVendor}</span>}
                       {doc.extractedAmount !== null && <span>{formatCurrency(doc.extractedAmount)}</span>}
                       {doc.extractedDate && <span>{formatDate(doc.extractedDate)}</span>}
-                      <span className={`px-1.5 py-0.5 rounded ${doc.matchedTransactionIds.length > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
+                      <span className={`px-1.5 py-0.5 rounded ${doc.matchedTransactionIds.length > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
                         {doc.matchedTransactionIds.length > 0 ? 'Matched' : 'Unmatched'}
                       </span>
                     </div>
@@ -494,8 +494,8 @@ function DocumentPickerDialog({ isOpen, onClose, transaction, updateTransaction 
           })}
         </div>
         {selectedIds.length > 0 && (
-          <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-            <span className="text-sm text-gray-600 dark:text-gray-400">{selectedIds.length} document{selectedIds.length > 1 ? 's' : ''} selected</span>
+          <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+            <span className="text-sm text-gray-600">{selectedIds.length} document{selectedIds.length > 1 ? 's' : ''} selected</span>
             <button onClick={handleProceed} className="btn-primary btn-sm flex items-center gap-1.5"><Check size={14} />Match</button>
           </div>
         )}

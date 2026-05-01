@@ -98,15 +98,15 @@ export default function ExportPage() {
   return (
     <div>
       <div className="mb-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Export</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Export</h2>
         <p className="text-sm text-gray-500 mt-1">
           Download a color-coded Excel workbook plus an organized folder of every linked PDF.
         </p>
       </div>
 
       <div className="card p-4 mb-6 flex items-center justify-between">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          <span className="font-semibold text-gray-900 dark:text-gray-100">{filteredCount}</span>{' '}
+        <div className="text-sm text-gray-600">
+          <span className="font-semibold text-gray-900">{filteredCount}</span>{' '}
           of {transactions.length} transactions match current filters · {documents.length} documents in storage
         </div>
         <div className="text-sm text-gray-500">
@@ -119,7 +119,7 @@ export default function ExportPage() {
         {/* Filters column */}
         <div className="lg:col-span-2 space-y-4">
           <div className="card p-4">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Filters</h3>
+            <h3 className="font-semibold text-gray-900 mb-3">Filters</h3>
 
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
@@ -144,8 +144,8 @@ export default function ExportPage() {
                       onClick={() => toggle(statuses, opt.value, setStatuses)}
                       className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                         active
-                          ? 'bg-primary-600 text-white border-primary-600'
-                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          ? 'bg-[var(--c-gray-900)] text-white border-[var(--c-gray-900)]'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-[var(--c-gray-100)]'
                       }`}>
                       {opt.label}
                     </button>
@@ -164,8 +164,8 @@ export default function ExportPage() {
                       onClick={() => toggle(categoryIds, c.id, setCategoryIds)}
                       className={`px-3 py-1 text-xs rounded-full border transition-colors ${
                         active
-                          ? 'bg-primary-600 text-white border-primary-600'
-                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          ? 'bg-[var(--c-gray-900)] text-white border-[var(--c-gray-900)]'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-[var(--c-gray-100)]'
                       } ${c.parentId ? 'ml-3' : ''}`}>
                       {c.name}
                     </button>
@@ -176,8 +176,8 @@ export default function ExportPage() {
           </div>
 
           <div className="card p-4">
-            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Export contents</h4>
-            <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1 list-disc pl-5">
+            <h4 className="font-medium text-gray-900 mb-2">Export contents</h4>
+            <ul className="text-sm text-gray-600 space-y-1 list-disc pl-5">
               <li><strong>Reconciliation_YYYY-MM.xlsx</strong> — four sheets: Transactions, Documents, By Category, Outstanding</li>
               <li><strong>Documents/</strong> — PDFs organized by category and contact, named with date / direction / vendor / amount</li>
               <li><strong>README.txt</strong> — date range, totals, status breakdown</li>
@@ -191,10 +191,10 @@ export default function ExportPage() {
             <div className="mb-3">
               {exporting
                 ? <Loader2 size={32} className="mx-auto text-gray-400 animate-spin" />
-                : <Archive size={32} className="mx-auto text-primary-600" />
+                : <Archive size={32} className="mx-auto text-[var(--c-gray-900)]" />
               }
             </div>
-            <h3 className="font-semibold mb-1 text-gray-900 dark:text-gray-100">Reconciliation Bundle</h3>
+            <h3 className="font-semibold mb-1 text-gray-900">Reconciliation Bundle</h3>
             <p className="text-sm text-gray-500 mb-4">
               Excel workbook + organized PDFs in one zip
             </p>

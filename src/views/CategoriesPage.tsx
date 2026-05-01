@@ -85,7 +85,7 @@ export default function CategoriesPage() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Categories</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Categories</h2>
           <p className="text-sm text-gray-500 mt-1">{categories.length} categories</p>
         </div>
         <button onClick={() => openAddForm()} className="btn-primary btn-sm flex items-center gap-2">
@@ -100,8 +100,8 @@ export default function CategoriesPage() {
           const isCollapsed = collapsedGroups.has(parent.id)
           const groupTotal = children.reduce((sum, c) => sum + getCategoryTransactionCount(c.id), 0)
           return (
-            <div key={parent.id} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
-              <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 flex items-center gap-3 group">
+            <div key={parent.id} className="border-b border-gray-200 last:border-b-0">
+              <div className="px-4 py-3 bg-gray-50 flex items-center gap-3 group">
                 <button onClick={() => toggleCollapse(parent.id)} className="p-0.5">
                   {isCollapsed ? <ChevronRight size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
                 </button>
@@ -109,21 +109,21 @@ export default function CategoriesPage() {
                 <span className="font-semibold text-sm flex-1">{parent.name}</span>
                 <span className="text-xs text-gray-400">{children.length} sub · {groupTotal} txns</span>
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                  <button onClick={() => openAddForm(parent.id)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" title="Add subcategory"><Plus size={14} className="text-gray-500" /></button>
-                  <button onClick={() => openEditForm(parent.id)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" title="Edit"><Edit2 size={14} className="text-gray-500" /></button>
-                  {!parent.isDefault && <button onClick={() => handleDelete(parent.id)} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded" title="Delete"><Trash2 size={14} className="text-red-500" /></button>}
+                  <button onClick={() => openAddForm(parent.id)} className="p-1 hover:bg-[var(--c-gray-100)] rounded" title="Add subcategory"><Plus size={14} className="text-gray-500" /></button>
+                  <button onClick={() => openEditForm(parent.id)} className="p-1 hover:bg-[var(--c-gray-100)] rounded" title="Edit"><Edit2 size={14} className="text-gray-500" /></button>
+                  {!parent.isDefault && <button onClick={() => handleDelete(parent.id)} className="p-1 hover:bg-red-900/30 rounded" title="Delete"><Trash2 size={14} className="text-red-500" /></button>}
                 </div>
               </div>
               {!isCollapsed && children.map((child) => {
                 const count = getCategoryTransactionCount(child.id)
                 return (
-                  <div key={child.id} className="px-4 py-2.5 pl-12 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800 group">
+                  <div key={child.id} className="px-4 py-2.5 pl-12 flex items-center gap-3 hover:bg-[var(--c-gray-100)] border-t border-gray-100 group">
                     <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: child.color }} />
                     <span className="text-sm flex-1">{child.name}</span>
                     {count > 0 && <span className="text-xs text-gray-400">{count}</span>}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                      <button onClick={() => openEditForm(child.id)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" title="Edit"><Edit2 size={13} className="text-gray-500" /></button>
-                      {!child.isDefault && <button onClick={() => handleDelete(child.id)} className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded" title="Delete"><Trash2 size={13} className="text-red-500" /></button>}
+                      <button onClick={() => openEditForm(child.id)} className="p-1 hover:bg-[var(--c-gray-100)] rounded" title="Edit"><Edit2 size={13} className="text-gray-500" /></button>
+                      {!child.isDefault && <button onClick={() => handleDelete(child.id)} className="p-1 hover:bg-red-900/30 rounded" title="Delete"><Trash2 size={13} className="text-red-500" /></button>}
                     </div>
                   </div>
                 )
@@ -151,7 +151,7 @@ export default function CategoriesPage() {
             <div className="flex flex-wrap gap-2">
               {PRESET_COLORS.map((c) => (
                 <button key={c} onClick={() => setFormData({ ...formData, color: c })}
-                  className={`w-7 h-7 rounded-full border-2 transition-transform ${formData.color === c ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent hover:scale-105'}`}
+                  className={`w-7 h-7 rounded-full border-2 transition-transform ${formData.color === c ? 'border-gray-900 scale-110' : 'border-transparent hover:scale-105'}`}
                   style={{ backgroundColor: c }} />
               ))}
             </div>
@@ -160,7 +160,7 @@ export default function CategoriesPage() {
               <input type="text" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} className="input-field text-sm font-mono w-28" />
             </div>
           </div>
-          <div className="flex gap-2 justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex gap-2 justify-end pt-2 border-t border-gray-200">
             <button onClick={() => setShowForm(false)} className="btn-secondary btn-sm">Cancel</button>
             <button onClick={handleSave} className="btn-primary btn-sm">{editingId ? 'Save Changes' : 'Add Category'}</button>
           </div>

@@ -1,65 +1,171 @@
 @import "tailwindcss";
 
-@theme {
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
+/* ----------------------------------------------------------------------
+ * Reconciler design tokens — mirrored from Accurat Archive
+ * (see ~/Desktop/Claude/Claude_Projects/Archive/ACCURAT ARCHIVE/
+ *      accurat-archive-web/docs/DESIGN-SYSTEM.md)
+ *
+ * All visual decisions are expressed as `--c-*` (color),
+ * `--radius-*`, `--shadow-*`, and layout custom properties.  Light-only
+ * — there is no dark-mode token set; this matches Archive.
+ * ---------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('https://rsms.me/inter/font-files/InterVariable.woff2') format('woff2');
 }
 
-/* Card */
+:root {
+  --c-black: #0a0a0a;
+  --c-white: #ffffff;
+  --c-off-white: #f7f7f5;
+
+  --c-gray-50:  #fafaf9;
+  --c-gray-100: #f3f3f1;
+  --c-gray-200: #e5e5e2;
+  --c-gray-300: #d4d4d0;
+  --c-gray-400: #6f6f6c;
+  --c-gray-500: #5f5f5c;
+  --c-gray-600: #525250;
+  --c-gray-700: #3f3f3d;
+  --c-gray-800: #292929;
+  --c-gray-900: #171717;
+  --c-gray-950: #0a0a0a;
+
+  --c-accent:        #3b82f6;
+  --c-accent-hover:  #2563eb;
+  --c-accent-light:  #eff6ff;
+  --c-accent-muted:  #93c5fd;
+
+  --c-success: #22c55e;
+  --c-warning: #eab308;
+  --c-error:   #ef4444;
+  --c-ai:      #a78bfa;
+  --c-ai-bg:   #f5f3ff;
+
+  --max-w:     1040px;
+  --sidebar-w: 260px;
+  --topbar-h:  48px;
+
+  --radius-sm:   3px;
+  --radius-md:   5px;
+  --radius-lg:   8px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 2px 8px rgba(0,0,0,.05);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,.07);
+}
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; }
+}
+
+html {
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: var(--c-gray-900);
+  background: var(--c-white);
+  line-height: 1.6;
+  letter-spacing: -0.011em;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-gray-300); border-radius: var(--radius-full); }
+::-webkit-scrollbar-thumb:hover { background: var(--c-gray-400); }
+
+:focus-visible { outline: 2px solid var(--c-accent-muted); outline-offset: 1px; }
+::selection { background: var(--c-accent-light); color: var(--c-accent); }
+
+input, textarea, select { font-family: inherit; font-size: inherit; letter-spacing: inherit; }
+img, video { display: block; }
+
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ----------------------------------------------------------------------
+ * Reusable component classes
+ * Match Archive's monochrome look: black-on-white primary, sharp 5px
+ * corners, very subtle shadow.  No dark-mode variants.
+ * ---------------------------------------------------------------------- */
+
 .card {
-  @apply bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm;
+  background: var(--c-white);
+  border: 1px solid var(--c-gray-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Buttons */
 .btn-primary {
-  @apply bg-primary-600 hover:bg-primary-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
+  background: var(--c-gray-900);
+  color: var(--c-white);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  transition: background 120ms ease;
 }
+.btn-primary:hover { background: var(--c-gray-800); }
+.btn-primary:disabled { background: var(--c-gray-300); cursor: not-allowed; }
+
 .btn-secondary {
-  @apply bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium px-4 py-2 rounded-lg transition-colors;
+  background: var(--c-white);
+  color: var(--c-gray-900);
+  border: 1px solid var(--c-gray-300);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  transition: background 120ms ease, border-color 120ms ease;
 }
+.btn-secondary:hover { background: var(--c-gray-50); border-color: var(--c-gray-400); }
+
 .btn-ghost {
-  @apply hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium px-3 py-1.5 rounded-lg transition-colors;
-}
-.btn-sm {
-  @apply text-sm px-3 py-1.5;
-}
-.btn-danger {
-  @apply bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
-}
-
-/* Inputs */
-.input-field {
-  @apply w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow;
-}
-
-/* Text helpers — WCAG AA compliant on white/dark surfaces.
- * Use .text-muted for descriptive/helper text instead of raw text-gray-500.
- *  - light bg: gray-600 → 7.5:1 contrast (AA Large + AA Normal)
- *  - dark bg:  gray-400 → 7.5:1 contrast (AA Large + AA Normal)
- */
-.text-muted   { @apply text-gray-600 dark:text-gray-400; }
-.text-subtle  { @apply text-gray-500 dark:text-gray-500; } /* explicit secondary */
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
   background: transparent;
+  color: var(--c-gray-700);
+  font-weight: 500;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-md);
+  transition: background 120ms ease, color 120ms ease;
 }
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+.btn-ghost:hover { background: var(--c-gray-100); color: var(--c-gray-900); }
+
+.btn-sm { font-size: 0.875rem; padding: 0.375rem 0.75rem; }
+
+.btn-danger {
+  background: var(--c-error);
+  color: var(--c-white);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  transition: opacity 120ms ease;
 }
-.dark ::-webkit-scrollbar-thumb {
-  background: #475569;
+.btn-danger:hover { opacity: 0.9; }
+
+.input-field {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--c-white);
+  color: var(--c-gray-900);
+  border: 1px solid var(--c-gray-300);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
+.input-field::placeholder { color: var(--c-gray-400); }
+.input-field:focus {
+  outline: none;
+  border-color: var(--c-gray-900);
+  box-shadow: 0 0 0 1px var(--c-gray-900);
+}
+
+/* Helper utilities — used wherever Tailwind's text-gray-* is too soft */
+.text-muted   { color: var(--c-gray-600); }
+.text-subtle  { color: var(--c-gray-500); }

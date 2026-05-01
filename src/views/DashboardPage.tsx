@@ -93,10 +93,10 @@ export default function DashboardPage() {
   const recurringPatterns = useMemo(() => detectRecurringPatterns(transactions, contacts), [transactions, contacts])
 
   const cards = [
-    { label: 'Total Income', value: formatCurrency(stats.totalIncome), icon: <TrendingUp size={20} />, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    { label: 'Total Expenses', value: formatCurrency(stats.totalExpenses), icon: <TrendingDown size={20} />, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/20' },
-    { label: 'Net Cash Flow', value: (stats.netCashFlow >= 0 ? '+' : '-') + formatCurrency(stats.netCashFlow), icon: <DollarSign size={20} />, color: stats.netCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    { label: 'Unreconciled', value: String(stats.unreconciled), icon: <AlertCircle size={20} />, color: stats.unreconciled > 0 ? 'text-amber-600' : 'text-gray-600', bg: 'bg-amber-50 dark:bg-amber-900/20' }
+    { label: 'Total Income', value: formatCurrency(stats.totalIncome), icon: <TrendingUp size={20} />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Total Expenses', value: formatCurrency(stats.totalExpenses), icon: <TrendingDown size={20} />, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'Net Cash Flow', value: (stats.netCashFlow >= 0 ? '+' : '-') + formatCurrency(stats.netCashFlow), icon: <DollarSign size={20} />, color: stats.netCashFlow >= 0 ? 'text-emerald-600' : 'text-red-600', bg: 'bg-blue-50' },
+    { label: 'Unreconciled', value: String(stats.unreconciled), icon: <AlertCircle size={20} />, color: stats.unreconciled > 0 ? 'text-amber-600' : 'text-gray-600', bg: 'bg-amber-50' }
   ]
 
   const formatTooltipValue = (value: number) => formatCurrency(value)
@@ -104,7 +104,7 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
         <p className="text-sm text-gray-500 mt-1">Financial overview</p>
       </div>
 
@@ -124,7 +124,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div className="card p-6">
-          <h3 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Monthly Income vs Expenses</h3>
+          <h3 className="font-semibold mb-4 text-gray-900">Monthly Income vs Expenses</h3>
           {transactions.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-gray-400 text-sm">Import transactions to see monthly data</div>
           ) : (
@@ -145,7 +145,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="card p-6">
-          <h3 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Category Breakdown</h3>
+          <h3 className="font-semibold mb-4 text-gray-900">Category Breakdown</h3>
           {categoryData.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-gray-400 text-sm">Categorize transactions to see breakdown</div>
           ) : (
@@ -168,7 +168,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="card p-6">
-          <h3 className="font-semibold mb-4 text-gray-900 dark:text-gray-100">Cash Flow Trend</h3>
+          <h3 className="font-semibold mb-4 text-gray-900">Cash Flow Trend</h3>
           {cashFlowData.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-gray-400 text-sm">Import transactions to see cash flow trend</div>
           ) : (
@@ -195,7 +195,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="card p-6">
-          <h3 className="font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center gap-2">
+          <h3 className="font-semibold mb-4 text-gray-900 flex items-center gap-2">
             <RefreshCw size={16} />
             Recurring Payments
           </h3>
@@ -205,19 +205,19 @@ export default function DashboardPage() {
             <div className="h-64 overflow-y-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                  <tr className="text-left text-gray-500 border-b border-gray-200">
                     <th className="pb-2 font-medium">Vendor</th>
                     <th className="pb-2 font-medium">Frequency</th>
                     <th className="pb-2 font-medium text-right">Avg Amount</th>
                     <th className="pb-2 font-medium text-right">Count</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                <tbody className="divide-y divide-gray-100">
                   {recurringPatterns.slice(0, 10).map((pattern) => (
-                    <tr key={pattern.contactId} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="py-2 text-gray-900 dark:text-gray-100 font-medium">{pattern.contactName}</td>
+                    <tr key={pattern.contactId} className="hover:bg-[var(--c-gray-100)]">
+                      <td className="py-2 text-gray-900 font-medium">{pattern.contactName}</td>
                       <td className="py-2"><FrequencyBadge frequency={pattern.frequency} confidence={pattern.confidence} /></td>
-                      <td className="py-2 text-right text-gray-700 dark:text-gray-300">{formatCurrency(pattern.avgAmount)}</td>
+                      <td className="py-2 text-right text-gray-700">{formatCurrency(pattern.avgAmount)}</td>
                       <td className="py-2 text-right text-gray-500">{pattern.transactionCount}</td>
                     </tr>
                   ))}
@@ -233,11 +233,11 @@ export default function DashboardPage() {
 
 function FrequencyBadge({ frequency, confidence }: { frequency: RecurringPattern['frequency']; confidence: number }) {
   const colors: Record<string, string> = {
-    weekly: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    biweekly: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
-    monthly: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    quarterly: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-    irregular: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+    weekly: 'bg-blue-100 text-blue-700',
+    biweekly: 'bg-cyan-100 text-cyan-700',
+    monthly: 'bg-emerald-100 text-emerald-700',
+    quarterly: 'bg-purple-100 text-purple-700',
+    irregular: 'bg-gray-100 text-gray-700'
   }
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${colors[frequency] || colors.irregular}`}

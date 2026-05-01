@@ -49,11 +49,11 @@ export function InlineEditableField({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className={`group inline-flex items-center gap-1 text-left px-1 -mx-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700/50 ${className}`}
+        className={`group inline-flex items-center gap-1 text-left px-1 -mx-1 rounded hover:bg-[var(--c-gray-100)] ${className}`}
       >
         <span className={value ? '' : 'italic text-gray-400'}>{value || placeholder}</span>
         {showHint && (
-          <Pencil size={11} className="text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Pencil size={11} className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
         )}
       </button>
     )

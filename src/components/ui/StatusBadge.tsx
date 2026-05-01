@@ -2,11 +2,11 @@ import React from 'react'
 import type { Transaction } from '@/lib/types'
 
 const STATUS_STYLES: Record<Transaction['status'], string> = {
-  reconciled:   'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  unreconciled: 'bg-amber-100   text-amber-700   dark:bg-amber-900/30   dark:text-amber-400',
-  flagged:      'bg-red-100     text-red-700     dark:bg-red-900/30     dark:text-red-400',
-  contract:     'bg-indigo-100  text-indigo-700  dark:bg-indigo-900/30  dark:text-indigo-400',
-  tax:          'bg-orange-100  text-orange-700  dark:bg-orange-900/30  dark:text-orange-400',
+  reconciled:   'bg-emerald-100 text-emerald-700',
+  unreconciled: 'bg-amber-100   text-amber-700    ',
+  flagged:      'bg-red-100     text-red-700        ',
+  contract:     'bg-indigo-100  text-indigo-700  ',
+  tax:          'bg-orange-100  text-orange-700  ',
 }
 
 const STATUS_LABELS: Record<Transaction['status'], string> = {

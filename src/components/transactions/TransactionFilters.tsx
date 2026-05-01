@@ -25,13 +25,13 @@ export default function TransactionFilters() {
     <div className="card mb-4">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-xl"
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 hover:bg-[var(--c-gray-100)] rounded-xl"
       >
         <div className="flex items-center gap-2">
           <Filter size={16} />
           <span>Filters</span>
           {hasActiveFilters && (
-            <span className="bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 text-xs font-medium px-2 py-0.5 rounded-full">
+            <span className="bg-[var(--c-gray-100)] text-[var(--c-gray-900)] text-xs font-medium px-2 py-0.5 rounded-full">
               Active
             </span>
           )}

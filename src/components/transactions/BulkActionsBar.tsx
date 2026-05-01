@@ -39,12 +39,12 @@ export default function BulkActionsBar() {
   }
 
   return (
-    <div className="card px-4 py-2 mb-3 flex items-center gap-3 bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800">
-      <span className="text-sm font-medium text-primary-700 dark:text-primary-400">
+    <div className="card px-4 py-2 mb-3 flex items-center gap-3 bg-[var(--c-gray-50)] border-[var(--c-gray-200)]">
+      <span className="text-sm font-medium text-[var(--c-gray-900)]">
         {count} selected
       </span>
 
-      <div className="h-4 w-px bg-primary-200 dark:bg-primary-700" />
+      <div className="h-4 w-px bg-[var(--c-gray-200)]" />
 
       <div className="relative">
         <button
@@ -55,7 +55,7 @@ export default function BulkActionsBar() {
           Set Category
         </button>
         {showCategorySelect && (
-          <div className="absolute top-full mt-1 left-0 z-50 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 max-h-60 overflow-y-auto">
+          <div className="absolute top-full mt-1 left-0 z-50 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 max-h-60 overflow-y-auto">
             {topCategories.map((parent) => {
               const children = categories.filter((c) => c.parentId === parent.id)
               return (
@@ -67,7 +67,7 @@ export default function BulkActionsBar() {
                     <button
                       key={child.id}
                       onClick={() => handleSetCategory(child.id)}
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--c-gray-100)] flex items-center gap-2"
                     >
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: child.color }} />
                       {child.name}
@@ -89,14 +89,14 @@ export default function BulkActionsBar() {
           Set Contact
         </button>
         {showContactSelect && (
-          <div className="absolute top-full mt-1 left-0 z-50 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 max-h-60 overflow-y-auto">
+          <div className="absolute top-full mt-1 left-0 z-50 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 max-h-60 overflow-y-auto">
             {contacts
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((c) => (
                 <button
                   key={c.id}
                   onClick={() => handleSetContact(c.id)}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-[var(--c-gray-100)] flex items-center gap-2"
                 >
                   <span className={`w-2 h-2 rounded-full ${
                     c.type === 'client' ? 'bg-emerald-500' : c.type === 'vendor' ? 'bg-blue-500' : 'bg-purple-500'
@@ -108,7 +108,7 @@ export default function BulkActionsBar() {
         )}
       </div>
 
-      <div className="h-4 w-px bg-primary-200 dark:bg-primary-700" />
+      <div className="h-4 w-px bg-[var(--c-gray-200)]" />
 
       <button
         onClick={() => handleSetStatus('reconciled')}
@@ -146,7 +146,7 @@ export default function BulkActionsBar() {
         Tax
       </button>
 
-      <button onClick={clearSelection} className="ml-auto btn-ghost btn-sm text-gray-400 hover:text-gray-600">
+      <button onClick={clearSelection} className="ml-auto btn-ghost btn-sm text-gray-400 hover">
         <X size={14} />
       </button>
     </div>

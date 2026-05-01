@@ -120,7 +120,7 @@ export default function ImportCSVDialog() {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
         {/* Hidden file input */}
         <input
           ref={fileInputRef}
@@ -131,7 +131,7 @@ export default function ImportCSVDialog() {
         />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold">Import Bank CSV</h2>
           <button onClick={handleClose} className="btn-ghost p-1 rounded-full">
             <X size={20} />
@@ -142,10 +142,10 @@ export default function ImportCSVDialog() {
         <div className="px-6 py-6">
           {state.status === 'idle' ? (
             <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center">
-                <FileSpreadsheet size={32} className="text-primary-600" />
+              <div className="w-16 h-16 mx-auto mb-4 bg-[var(--c-gray-100)] rounded-2xl flex items-center justify-center">
+                <FileSpreadsheet size={32} className="text-[var(--c-gray-900)]" />
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              <p className="text-sm text-gray-600 mb-6">
                 Select a Chase bank statement CSV file to import. Duplicate transactions will be
                 automatically skipped.
               </p>
@@ -159,7 +159,7 @@ export default function ImportCSVDialog() {
             </div>
           ) : state.status === 'parsing' ? (
             <div className="text-center py-4">
-              <div className="animate-spin w-8 h-8 border-3 border-primary-600 border-t-transparent rounded-full mx-auto mb-4" />
+              <div className="animate-spin w-8 h-8 border-3 border-[var(--c-gray-900)] border-t-transparent rounded-full mx-auto mb-4" />
               <p className="text-sm text-gray-600">Parsing and importing...</p>
             </div>
           ) : state.status === 'done' ? (
@@ -188,7 +188,7 @@ export default function ImportCSVDialog() {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
           {state.status === 'done' || state.status === 'error' ? (
             <>
               <button onClick={handleSelectFile} className="btn-secondary btn-sm">

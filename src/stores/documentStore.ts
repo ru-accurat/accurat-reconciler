@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import { DocumentRecord } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
+import { useTransactionStore } from '@/stores/transactionStore'
 
 function stripNulDeep<T>(value: T): T {
   if (typeof value === 'string') return value.replace(/ /g, '') as T
@@ -90,9 +91,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       throw docErr
     }
 
-    // Junction: rebuild for these docs only.  Delete then re-insert is the
-    // simplest atomic pattern under Supabase's REST API; volume is small
-    // (one row per doc-txn match, ~hundreds total).
+    // Junction: rebuild for these docs only.  Delete-then-upsert pattern;
+    // upsert(onConflict) is idempotent, so a concurrent save can't double-
+    // insert.  We pre-filter against the in-memory transactions list so an
+    // FK violation can't sink the whole save (a stale matched id from an
+    // earlier session, for example, just gets dropped).
     const docIds = sanitized.map((d: DocumentRecord) => d.id)
     const { error: delErr } = await supabase
       .from('document_transactions')
@@ -102,18 +105,26 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       console.error('documentStore.save (junction delete) failed:', delErr)
       throw delErr
     }
+    // Only insert junction rows whose txn id we can see right now in the
+    // transaction store; prevents the whole save from failing on a stale ref.
+    const knownTxnIds = new Set(useTransactionStore.getState().transactions.map(t => t.id))
+    const seen = new Set<string>()
     const junctionRows: Array<{ document_id: string; transaction_id: string }> = []
     for (const d of sanitized as DocumentRecord[]) {
       for (const tid of d.matchedTransactionIds ?? []) {
+        if (!knownTxnIds.has(tid)) continue          // FK guard
+        const key = `${d.id}:${tid}`
+        if (seen.has(key)) continue                   // de-dup within this batch
+        seen.add(key)
         junctionRows.push({ document_id: d.id, transaction_id: tid })
       }
     }
     if (junctionRows.length > 0) {
       const { error: jErr } = await supabase
         .from('document_transactions')
-        .insert(junctionRows)
+        .upsert(junctionRows, { onConflict: 'document_id,transaction_id' })
       if (jErr) {
-        console.error('documentStore.save (junction insert) failed:', jErr)
+        console.error('documentStore.save (junction upsert) failed:', JSON.stringify(jErr))
         throw jErr
       }
     }

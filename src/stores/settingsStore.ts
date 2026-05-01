@@ -27,19 +27,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   contractPatterns: []
 }
 
-function applyThemeToDocument(theme: 'light' | 'dark' | 'system'): void {
+// applyThemeToDocument is a no-op now that the app is light-only (Phase 1
+// Archive parity).  Kept as a function so call-sites that still wire it up
+// for future dark-mode reintroduction don't have to rebranch.
+function applyThemeToDocument(_theme: 'light' | 'dark' | 'system'): void {
   if (typeof document === 'undefined') return
-  const root = document.documentElement
-  if (theme === 'dark') {
-    root.classList.add('dark')
-  } else if (theme === 'light') {
-    root.classList.remove('dark')
-  } else {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    if (prefersDark) root.classList.add('dark')
-    else root.classList.remove('dark')
-  }
-  localStorage.setItem('reconciler-theme', theme)
+  document.documentElement.classList.remove('dark')
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({

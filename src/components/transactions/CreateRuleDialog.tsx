@@ -94,7 +94,7 @@ export default function CreateRuleDialog({
       <div className="space-y-4">
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">Transaction</label>
-          <div className="text-sm bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-lg font-mono text-gray-600 dark:text-gray-400 truncate">
+          <div className="text-sm bg-gray-50 px-3 py-2 rounded-lg font-mono text-gray-600 truncate">
             {transactionDescription}
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function CreateRuleDialog({
             </select>
           </div>
         </div>
-        <div className={`text-xs px-3 py-2 rounded-lg ${isMatch ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}>
+        <div className={`text-xs px-3 py-2 rounded-lg ${isMatch ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
           {isMatch ? 'Pattern matches this transaction' : 'Pattern does not match this transaction'}
         </div>
         <div className="flex gap-4 items-center">
@@ -154,7 +154,7 @@ export default function CreateRuleDialog({
             ))}
           </select>
         </div>
-        <div className="flex gap-2 justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex gap-2 justify-end pt-2 border-t border-gray-200">
           <button onClick={onClose} className="btn-secondary btn-sm">Cancel</button>
           <button onClick={handleCreate} className="btn-primary btn-sm" disabled={!pattern || !selectedCategoryId}>Create Rule</button>
         </div>
