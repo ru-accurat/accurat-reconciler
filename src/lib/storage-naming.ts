@@ -50,11 +50,13 @@ export function buildSemanticPath(doc: DocumentRecord, ctx: SemanticContext = {}
   return `${folder}/${filename}`
 }
 
-/** Computed thumbnail path that mirrors the document's semantic path. */
-export function buildSemanticThumbnailPath(doc: DocumentRecord, ctx: SemanticContext = {}): string {
-  const docPath = buildSemanticPath(doc, ctx)
-  const noExt = docPath.replace(/\.[^./]+$/, '')
-  return `thumbnails/${noExt}.webp`
+/**
+ * Thumbnail path is intentionally docId-based, NOT semantic.  Keeping it
+ * stable means renames of the source PDF never break thumbnails (and
+ * ensures the lazy-generation cache key matches whatever's in storage).
+ */
+export function buildSemanticThumbnailPath(doc: DocumentRecord, _ctx: SemanticContext = {}): string {
+  return `thumbnails/${doc.id}.webp`
 }
 
 function extractExtension(name: string): string {

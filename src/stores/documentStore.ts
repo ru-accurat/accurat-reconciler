@@ -102,26 +102,34 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     // in-memory state on every auto-save, an external rename (or a
     // background script) would get clobbered the next time auto-save fired
     // with stale path data.
-    const rows = sanitized.map((d: DocumentRecord) => ({
-      id: d.id,
-      original_filename: d.originalFilename,
-      extracted_text: d.extractedText ?? '',
-      extracted_date: d.extractedDate ?? null,
-      extracted_amount: d.extractedAmount ?? null,
-      extracted_vendor: d.extractedVendor ?? null,
-      extracted_invoice_number: d.extractedInvoiceNumber ?? null,
-      extracted_billing_year: d.extractedBillingPeriod?.year ?? null,
-      extracted_billing_month: d.extractedBillingPeriod?.month ?? null,
-      extracted_entities: d.extractedEntities ?? null,
-      direction: d.direction ?? 'incoming',
-      match_confidence: d.matchConfidence ?? 0,
-      match_method: d.matchMethod ?? 'auto',
-      scanned_at: d.scannedAt,
-    }))
-    const { error: docErr } = await supabase.from('documents').upsert(rows, { onConflict: 'id' })
-    if (docErr) {
-      console.error('documentStore.save (rows) failed:', docErr)
-      throw docErr
+    // We have to UPDATE (not UPSERT) because PostgREST's upsert dispatches
+    // an INSERT with `columns=…` first, which fails the documents NOT NULL
+    // on stored_path before the ON CONFLICT branch fires.  New rows are
+    // always created by addDocument()'s explicit INSERT; save() only ever
+    // mutates existing ones.  Run updates in parallel — Supabase JS has no
+    // bulk-update primitive.
+    const updates = sanitized.map((d: DocumentRecord) =>
+      supabase.from('documents').update({
+        original_filename: d.originalFilename,
+        extracted_text: d.extractedText ?? '',
+        extracted_date: d.extractedDate ?? null,
+        extracted_amount: d.extractedAmount ?? null,
+        extracted_vendor: d.extractedVendor ?? null,
+        extracted_invoice_number: d.extractedInvoiceNumber ?? null,
+        extracted_billing_year: d.extractedBillingPeriod?.year ?? null,
+        extracted_billing_month: d.extractedBillingPeriod?.month ?? null,
+        extracted_entities: d.extractedEntities ?? null,
+        direction: d.direction ?? 'incoming',
+        match_confidence: d.matchConfidence ?? 0,
+        match_method: d.matchMethod ?? 'auto',
+        scanned_at: d.scannedAt,
+      }).eq('id', d.id)
+    )
+    const results = await Promise.all(updates)
+    const firstErr = results.find((r) => r.error)?.error
+    if (firstErr) {
+      console.error('documentStore.save (rows) failed:', firstErr)
+      throw firstErr
     }
 
     // Junction: rebuild for these docs only.  Delete-then-upsert pattern;

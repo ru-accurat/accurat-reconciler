@@ -41,21 +41,10 @@ export async function renameDocumentStorageIfNeeded(
     historicalPaths: [...(doc.historicalPaths ?? []), doc.storedPath],
   }
 
-  if (doc.thumbnailPath) {
-    const desiredThumb = buildSemanticThumbnailPath(doc, ctx)
-    if (desiredThumb !== doc.thumbnailPath) {
-      const { error: thumbCopyErr } = await supabase
-        .storage
-        .from('documents')
-        .copy(doc.thumbnailPath, desiredThumb)
-      if (thumbCopyErr) {
-        patch.thumbnailPath = null
-      } else {
-        await supabase.storage.from('documents').remove([doc.thumbnailPath])
-        patch.thumbnailPath = desiredThumb
-      }
-    }
-  }
+  // Thumbnails live at `thumbnails/<docId>.webp` (docId-based, stable).
+  // They never need renaming when the source PDF is renamed, so we just
+  // ensure the patch carries the canonical path forward.
+  patch.thumbnailPath = buildSemanticThumbnailPath(doc, ctx)
 
   // Persist path columns to DB directly — auto-save deliberately skips
   // these (the rename subsystem owns them) so the patch needs to write
