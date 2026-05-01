@@ -8,6 +8,7 @@ import type {
   Contact,
   Category,
 } from '@/lib/types'
+import { buildSemanticPath } from '@/lib/storage-naming'
 
 export interface BundleInput {
   transactions: Transaction[]
@@ -22,7 +23,9 @@ export interface BundleInput {
 /**
  * Stream a zip file containing:
  *   <workbookFilename>
- *   Documents/<Income|Expenses|Transfers|...>/<Contact-or-Vendor>/<semantic-name>.pdf
+ *   Documents/<YYYY-MM>/<semantic-name>.pdf   (one folder per month;
+ *                                              undated docs land in
+ *                                              `Documents/unknown-date/`)
  *   README.txt
  *
  * Returns a stream that can be piped to a Response body.  Caller should
@@ -86,29 +89,33 @@ interface PdfTask {
 }
 
 function buildPdfPlan(input: BundleInput): PdfTask[] {
-  const contactById  = new Map(input.contacts.map(c => [c.id, c]))
+  const tasks: PdfTask[] = []
   const categoryById = new Map(input.categories.map(c => [c.id, c]))
   const txnById      = new Map(input.transactions.map(t => [t.id, t]))
-  const tasks: PdfTask[] = []
 
   for (const d of input.documents) {
-    const matchedTxn = (d.matchedTransactionIds ?? []).map(id => txnById.get(id)).find(Boolean)
-    const cat = matchedTxn?.categoryId ? categoryById.get(matchedTxn.categoryId) : null
-    const contact = matchedTxn?.contactId ? contactById.get(matchedTxn.contactId) : null
-
-    const catFolder = cat ? slug(cat.name) : 'unmatched'
-    const subFolder = contact ? slug(contact.name) : (d.extractedVendor ? slug(d.extractedVendor) : 'unknown-vendor')
-    const filename  = d.storedPath.split('/').pop() ?? d.originalFilename
-    const bundlePath = `Documents/${catFolder}/${subFolder}/${filename}`
-    tasks.push({ storedPath: d.storedPath, bundlePath })
+    // Compute the storage path from doc fields rather than trusting
+    // d.storedPath — the DB column can drift relative to actual storage
+    // when an external rename runs concurrently with a browser auto-save.
+    // The semantic path is deterministic from (date, vendor, direction,
+    // category) so we just rebuild it here.
+    const matchedTxn = (d.matchedTransactionIds ?? []).map(id => txnById.get(id)).find(t => t?.categoryId)
+    const categoryName = matchedTxn?.categoryId ? categoryById.get(matchedTxn.categoryId)?.name ?? null : null
+    const computed = buildSemanticPath(d, { category: categoryName })
+    const monthFolder = monthSlugFor(d.extractedDate)
+    const filename = computed.split('/').pop() ?? d.originalFilename
+    tasks.push({
+      storedPath: computed,
+      bundlePath: `Documents/${monthFolder}/${filename}`,
+    })
   }
   return tasks
 }
 
-function slug(s: string): string {
-  return s.normalize('NFKD').replace(/[̀-ͯ]/g, '')
-    .replace(/[\\/:*?"<>|]/g, '_')
-    .trim() || 'unknown'
+function monthSlugFor(date: string | null | undefined): string {
+  if (!date) return 'unknown-date'
+  const m = /^(\d{4})-(\d{2})/.exec(date)
+  return m ? `${m[1]}-${m[2]}` : 'unknown-date'
 }
 
 interface Totals {
@@ -162,8 +169,8 @@ function buildReadme(_: BundleInput, t: Totals, generatedAt: string): string {
     `Expenses:     ${t.expenses.toFixed(2)}`,
     `Net:          ${t.net.toFixed(2)}`,
     ``,
-    `Documents/ folder is organized by category and contact; each file's`,
-    `name encodes its date, direction, vendor, and amount.`,
+    `Documents/ folder is organized by month (YYYY-MM); each file's`,
+    `name encodes its date, direction, vendor, and category.`,
   ]
   return lines.join('\n')
 }

@@ -6,15 +6,24 @@ import type { DocumentRecord } from '@/lib/types'
  * (no leading slash) suitable for `supabase.storage.from('documents')`.
  *
  * Layout:
- *   documents/<YYYY>/<YYYY-MM>/<YYYY-MM-DD>_<direction>_<vendor>_<amount>_<stem>.<ext>
+ *   documents/<YYYY>/<YYYY-MM>/<YYYY-MM-DD>_<direction>_<vendor>_<category>.<ext>
  *
- * Falls back to `unknown-date`, `unknown-vendor`, `unknown-amount` when a
+ * Falls back to `unknown-date`, `unknown-vendor`, `uncategorized` when a
  * field is missing.  `unknown-date` files cluster under
  * `documents/unknown-date/`.
+ *
+ * Note: the original uploaded filename is intentionally NOT part of the
+ * stored path — every doc gets a fresh, semantically meaningful name on
+ * upload (or on first tag edit).  This keeps the file manager view
+ * useful: every file's name self-describes what it is.
  */
-export function buildSemanticPath(doc: DocumentRecord): string {
+export interface SemanticContext {
+  /** Resolved category name for the doc's match (if any). */
+  category?: string | null
+}
+
+export function buildSemanticPath(doc: DocumentRecord, ctx: SemanticContext = {}): string {
   const ext = extractExtension(doc.originalFilename) || 'pdf'
-  const stem = slugifyStem(stripExtension(doc.originalFilename) || 'document', 32)
   const dateStr = doc.extractedDate || ''
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
 
@@ -22,27 +31,20 @@ export function buildSemanticPath(doc: DocumentRecord): string {
   const month  = m ? `${m[1]}-${m[2]}` : ''
   const dayKey = m ? `${m[1]}-${m[2]}-${m[3]}` : 'unknown-date'
 
-  const folder = m ? `${year}/${month}` : 'unknown-date'
+  const folder   = m ? `${year}/${month}` : 'unknown-date'
+  const vendor   = slugifyStem(doc.extractedVendor ?? '', 40) || 'unknown-vendor'
+  const category = slugifyStem(ctx.category ?? '', 30) || 'uncategorized'
+  const dir      = doc.direction || 'incoming'
 
-  const vendor = slugifyStem(doc.extractedVendor ?? '', 40) || 'unknown-vendor'
-  const amount = formatAmount(doc.extractedAmount)
-  const dir    = doc.direction || 'incoming'
-
-  const filename = `${dayKey}_${dir}_${vendor}_${amount}_${stem}.${ext}`
+  const filename = `${dayKey}_${dir}_${vendor}_${category}.${ext}`
   return `${folder}/${filename}`
 }
 
 /** Computed thumbnail path that mirrors the document's semantic path. */
-export function buildSemanticThumbnailPath(doc: DocumentRecord): string {
-  const docPath = buildSemanticPath(doc)
-  // strip extension, append `.webp`, prefix `thumbnails/`
+export function buildSemanticThumbnailPath(doc: DocumentRecord, ctx: SemanticContext = {}): string {
+  const docPath = buildSemanticPath(doc, ctx)
   const noExt = docPath.replace(/\.[^./]+$/, '')
   return `thumbnails/${noExt}.webp`
-}
-
-function stripExtension(name: string): string {
-  const i = name.lastIndexOf('.')
-  return i > 0 ? name.slice(0, i) : name
 }
 
 function extractExtension(name: string): string {
@@ -65,11 +67,4 @@ function slugifyStem(input: string, maxLen: number): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, maxLen)
     .replace(/-+$/, '')
-}
-
-function formatAmount(amount: number | null | undefined): string {
-  if (amount === null || amount === undefined || Number.isNaN(amount)) return 'unknown-amount'
-  // Two decimals, no thousands separator — keeps filenames lexicographically sortable
-  // and free of commas (which Supabase Storage rejects in some clients).
-  return amount.toFixed(2)
 }

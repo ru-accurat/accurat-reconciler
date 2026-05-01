@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid'
 import { DocumentRecord } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
 import { useTransactionStore } from '@/stores/transactionStore'
+import { useCategoryStore } from '@/stores/categoryStore'
+import { buildSemanticPath, buildSemanticThumbnailPath } from '@/lib/storage-naming'
 
 function stripNulDeep<T>(value: T): T {
   if (typeof value === 'string') return value.replace(/ /g, '') as T
@@ -42,6 +44,32 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   addDocument: (docData) => {
     const doc: DocumentRecord = { ...docData, id: uuidv4() }
     set((state) => ({ documents: [...state.documents, doc] }))
+    // Persist path-related columns immediately.  The auto-save save() path
+    // skips stored_path/thumbnail_path on purpose (it's owned by the rename
+    // subsystem, see notes there).  For a brand-new doc the row doesn't
+    // exist yet, so we insert it here in full.  If this fails the row is
+    // still in memory and subsequent rename activity will retry.
+    supabase.from('documents').insert({
+      id: doc.id,
+      original_filename: doc.originalFilename,
+      stored_path: doc.storedPath,
+      thumbnail_path: doc.thumbnailPath ?? null,
+      historical_paths: doc.historicalPaths ?? [],
+      extracted_text: doc.extractedText ?? '',
+      extracted_date: doc.extractedDate ?? null,
+      extracted_amount: doc.extractedAmount ?? null,
+      extracted_vendor: doc.extractedVendor ?? null,
+      extracted_invoice_number: doc.extractedInvoiceNumber ?? null,
+      extracted_billing_year: doc.extractedBillingPeriod?.year ?? null,
+      extracted_billing_month: doc.extractedBillingPeriod?.month ?? null,
+      extracted_entities: doc.extractedEntities ?? null,
+      direction: doc.direction ?? 'incoming',
+      match_confidence: doc.matchConfidence ?? 0,
+      match_method: doc.matchMethod ?? 'auto',
+      scanned_at: doc.scannedAt,
+    }).then(({ error }) => {
+      if (error) console.error('documentStore.addDocument: row insert failed:', error)
+    })
     return doc
   },
 
@@ -66,12 +94,16 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const { documents } = get()
     if (documents.length === 0) return
     const sanitized = stripNulDeep(documents)
+    // NOTE: stored_path / thumbnail_path / historical_paths are intentionally
+    // NOT included here.  The rename subsystem (storage-rename.ts + the
+    // AppShell subscription) owns those columns and persists them directly
+    // via supabase.from('documents').update(...).  If we wrote them from
+    // in-memory state on every auto-save, an external rename (or a
+    // background script) would get clobbered the next time auto-save fired
+    // with stale path data.
     const rows = sanitized.map((d: DocumentRecord) => ({
       id: d.id,
       original_filename: d.originalFilename,
-      stored_path: d.storedPath,
-      thumbnail_path: d.thumbnailPath ?? null,
-      historical_paths: d.historicalPaths ?? [],
       extracted_text: d.extractedText ?? '',
       extracted_date: d.extractedDate ?? null,
       extracted_amount: d.extractedAmount ?? null,
@@ -144,27 +176,58 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         arr.push(j.transaction_id)
         txnsByDoc.set(j.document_id, arr)
       }
-      const documents: DocumentRecord[] = (rows ?? []).map((r: any) => ({
-        id: r.id,
-        originalFilename: r.original_filename,
-        storedPath: r.stored_path,
-        thumbnailPath: r.thumbnail_path ?? null,
-        historicalPaths: Array.isArray(r.historical_paths) ? r.historical_paths : [],
-        extractedText: r.extracted_text ?? '',
-        extractedDate: r.extracted_date ?? null,
-        extractedAmount: r.extracted_amount != null ? Number(r.extracted_amount) : null,
-        extractedVendor: r.extracted_vendor ?? null,
-        extractedInvoiceNumber: r.extracted_invoice_number ?? null,
-        extractedBillingPeriod: r.extracted_billing_year != null && r.extracted_billing_month != null
-          ? { year: r.extracted_billing_year, month: r.extracted_billing_month }
-          : null,
-        extractedEntities: r.extracted_entities ?? undefined,
-        direction: r.direction ?? 'incoming',
-        matchedTransactionIds: txnsByDoc.get(r.id) ?? [],
-        matchConfidence: Number(r.match_confidence ?? 0),
-        matchMethod: r.match_method ?? 'auto',
-        scannedAt: r.scanned_at,
-      }))
+      // For computing the storage path on the fly: resolve each doc's matched
+      // category from txn/category state.  documentStore.load may run before
+      // the transaction/category stores have hydrated; in that case we fall
+      // back to whatever stored_path is in the DB (and the rename hook will
+      // recompute later when category becomes available).
+      const txns = useTransactionStore.getState().transactions
+      const cats = useCategoryStore.getState().categories
+      const txnById = new Map(txns.map(t => [t.id, t]))
+      const catById = new Map(cats.map(c => [c.id, c]))
+      const resolveCategory = (docId: string): string | null => {
+        const tids = txnsByDoc.get(docId) ?? []
+        for (const tid of tids) {
+          const t = txnById.get(tid)
+          if (t?.categoryId) return catById.get(t.categoryId)?.name ?? null
+        }
+        return null
+      }
+      const documents: DocumentRecord[] = (rows ?? []).map((r: any) => {
+        const dbStoredPath: string = r.stored_path
+        const dbThumbPath: string | null = r.thumbnail_path ?? null
+        // Build a transient DocumentRecord with the DB stored_path so we can
+        // pass it to buildSemanticPath; the result replaces stored_path.
+        // Pending uploads keep their staging path so the upload flow can
+        // still find them.  Everything else gets the deterministic semantic
+        // path — protects in-app links from a stale DB stored_path.
+        const transient: DocumentRecord = {
+          id: r.id,
+          originalFilename: r.original_filename,
+          storedPath: dbStoredPath,
+          thumbnailPath: dbThumbPath,
+          historicalPaths: Array.isArray(r.historical_paths) ? r.historical_paths : [],
+          extractedText: r.extracted_text ?? '',
+          extractedDate: r.extracted_date ?? null,
+          extractedAmount: r.extracted_amount != null ? Number(r.extracted_amount) : null,
+          extractedVendor: r.extracted_vendor ?? null,
+          extractedInvoiceNumber: r.extracted_invoice_number ?? null,
+          extractedBillingPeriod: r.extracted_billing_year != null && r.extracted_billing_month != null
+            ? { year: r.extracted_billing_year, month: r.extracted_billing_month }
+            : null,
+          extractedEntities: r.extracted_entities ?? undefined,
+          direction: r.direction ?? 'incoming',
+          matchedTransactionIds: txnsByDoc.get(r.id) ?? [],
+          matchConfidence: Number(r.match_confidence ?? 0),
+          matchMethod: r.match_method ?? 'auto',
+          scannedAt: r.scanned_at,
+        }
+        if (dbStoredPath?.startsWith('pending/')) return transient
+        const ctx = { category: resolveCategory(r.id) }
+        const computed = buildSemanticPath(transient, ctx)
+        const computedThumb = dbThumbPath ? buildSemanticThumbnailPath(transient, ctx) : null
+        return { ...transient, storedPath: computed, thumbnailPath: computedThumb }
+      })
       set({ documents })
     } finally {
       set({ isLoading: false })

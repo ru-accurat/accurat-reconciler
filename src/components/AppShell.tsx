@@ -88,42 +88,63 @@ export default function AppShell() {
     return () => unsubs.forEach((u) => u())
   }, [saveAll])
 
-  // Auto-rename storage objects when a doc's tag fields change.  We diff
-  // prev vs next documents arrays inside a Zustand subscription; for each
-  // doc whose direction/vendor/date/amount changed (or that's brand new
-  // and still on its `pending/` ingest path) we move the storage file.
+  // Auto-rename storage objects when a doc's tag fields change, or when
+  // the matched transaction's category changes (which is part of the
+  // semantic filename now).  We watch the document store, the transaction
+  // store, and the category store; on each change we recompute every doc's
+  // signature and fire a rename for any whose signature drifted.
   // The first invocation just seeds the cache — load() runs async so we
   // don't want to trigger N renames on initial hydration.
   useEffect(() => {
     const seenSignatures = new Map<string, string>()
     let hydrated = false
 
-    return useDocumentStore.subscribe((state) => {
+    const resolveCategoryName = (docId: string): string | null => {
+      const doc = useDocumentStore.getState().documents.find((d) => d.id === docId)
+      if (!doc) return null
+      const txns = useTransactionStore.getState().transactions
+      const cats = useCategoryStore.getState().categories
+      const matched = (doc.matchedTransactionIds ?? [])
+        .map((tid) => txns.find((t) => t.id === tid))
+        .find((t) => t?.categoryId)
+      if (!matched?.categoryId) return null
+      return cats.find((c) => c.id === matched.categoryId)?.name ?? null
+    }
+
+    const reconcile = () => {
+      const docs = useDocumentStore.getState().documents
       if (!hydrated) {
-        for (const d of state.documents) seenSignatures.set(d.id, renameSignature(d))
+        for (const d of docs) {
+          seenSignatures.set(d.id, renameSignature(d, { category: resolveCategoryName(d.id) }))
+        }
         hydrated = true
         return
       }
-      for (const doc of state.documents) {
+      for (const doc of docs) {
+        const ctx = { category: resolveCategoryName(doc.id) }
         const prev = seenSignatures.get(doc.id)
-        const next = renameSignature(doc)
+        const next = renameSignature(doc, ctx)
         seenSignatures.set(doc.id, next)
         const isNew = prev === undefined
         if (!isNew && prev === next) continue
-        // For new uploads we only rename once they're out of the `pending/`
-        // staging folder logic — otherwise a fresh upload with no extracted
-        // tags yet would race with the extraction pass that fills them.
+        // Skip pending uploads until the extraction pass populates tags.
         if (isNew && doc.storedPath.startsWith('pending/') && !doc.extractedDate && !doc.extractedVendor) continue
-        renameDocumentStorageIfNeeded(doc)
+        renameDocumentStorageIfNeeded(doc, ctx)
           .then((patch) => {
             if (patch) useDocumentStore.getState().updateDocument(doc.id, patch)
           })
           .catch((err) => {
-            // Don't toast — background firing on every edit would be noisy.
             console.error('storage rename failed:', err)
           })
       }
-    })
+    }
+
+    const unsubs = [
+      useDocumentStore.subscribe(reconcile),
+      useTransactionStore.subscribe(reconcile),
+      useCategoryStore.subscribe(reconcile),
+    ]
+    return () => unsubs.forEach((u) => u())
   }, [])
 
   // Keyboard shortcuts

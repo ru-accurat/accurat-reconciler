@@ -21,6 +21,7 @@ import type {
   Contact,
   Category,
 } from '@/lib/types'
+import { buildSemanticPath } from '@/lib/storage-naming'
 
 export interface WorkbookInput {
   transactions: Transaction[]
@@ -147,38 +148,44 @@ function buildTransactionsSheet(
 // ----------------------------------------------------------------------
 function buildDocumentsSheet(
   wb: ExcelJS.Workbook,
-  { documents, transactions }: WorkbookInput,
+  { documents, transactions, categories }: WorkbookInput,
   contactById: Map<string, Contact>,
 ) {
   const ws = wb.addWorksheet('Documents', { views: [{ state: 'frozen', ySplit: 1 }] })
   ws.columns = [
-    { header: 'Date',           key: 'date',       width: 12 },
-    { header: 'Direction',      key: 'direction',  width: 12 },
-    { header: 'Vendor',         key: 'vendor',     width: 28 },
-    { header: 'Amount',         key: 'amount',     width: 12 },
-    { header: 'Invoice #',      key: 'invoice',    width: 18 },
-    { header: 'Original File',  key: 'file',       width: 36 },
-    { header: 'Storage Path',   key: 'path',       width: 60 },
-    { header: 'Matched Txns',   key: 'matched',    width: 12 },
-    { header: 'Linked Contact', key: 'contact',    width: 22 },
-    { header: 'Match Method',   key: 'method',     width: 10 },
-    { header: 'Match Confidence', key: 'conf',     width: 12 },
+    { header: 'Date',             key: 'date',       width: 12 },
+    { header: 'Direction',        key: 'direction',  width: 12 },
+    { header: 'Vendor',           key: 'vendor',     width: 28 },
+    { header: 'Amount',           key: 'amount',     width: 12 },
+    { header: 'Invoice #',        key: 'invoice',    width: 18 },
+    { header: 'Filename',         key: 'filename',   width: 70 },
+    { header: 'Matched Txns',     key: 'matched',    width: 12 },
+    { header: 'Linked Contact',   key: 'contact',    width: 22 },
+    { header: 'Match Method',     key: 'method',     width: 10 },
+    { header: 'Match Confidence', key: 'conf',       width: 12 },
   ]
   styleHeader(ws.getRow(1))
 
-  const txnById = new Map(transactions.map(t => [t.id, t]))
+  const txnById      = new Map(transactions.map(t => [t.id, t]))
+  const categoryById = new Map(categories.map(c => [c.id, c]))
   const sorted = [...documents].sort((a, b) => (a.extractedDate ?? '').localeCompare(b.extractedDate ?? ''))
   for (const d of sorted) {
     const firstTxn = (d.matchedTransactionIds ?? []).map(id => txnById.get(id)).find(Boolean)
     const linkedContact = firstTxn?.contactId ? contactById.get(firstTxn.contactId)?.name ?? '' : ''
+    // Compute the filename from doc fields rather than reading d.storedPath —
+    // the column can drift relative to actual storage during a concurrent
+    // rename + auto-save race.  buildSemanticPath is deterministic.
+    const matchedTxnWithCat = (d.matchedTransactionIds ?? []).map(id => txnById.get(id)).find(t => t?.categoryId)
+    const categoryName = matchedTxnWithCat?.categoryId ? categoryById.get(matchedTxnWithCat.categoryId)?.name ?? null : null
+    const computedPath = buildSemanticPath(d, { category: categoryName })
+    const filename = computedPath.split('/').pop() ?? computedPath
     const row = ws.addRow({
       date:      d.extractedDate ?? '',
       direction: d.direction,
       vendor:    d.extractedVendor ?? '',
       amount:    d.extractedAmount ?? '',
       invoice:   d.extractedInvoiceNumber ?? '',
-      file:      d.originalFilename,
-      path:      d.storedPath,
+      filename,
       matched:   (d.matchedTransactionIds ?? []).length,
       contact:   linkedContact,
       method:    d.matchMethod,
