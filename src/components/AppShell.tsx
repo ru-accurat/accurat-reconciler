@@ -11,6 +11,7 @@ import { useVendorAliasStore } from '@/stores/vendorAliasStore'
 import { useInvoiceTemplateStore } from '@/stores/invoiceTemplateStore'
 import { useVendorExtractionRuleStore } from '@/stores/vendorExtractionRuleStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { renameDocumentStorageIfNeeded, renameSignature } from '@/lib/storage-rename'
 
 import DashboardPage from '@/views/DashboardPage'
 import TransactionsPage from '@/views/TransactionsPage'
@@ -85,6 +86,44 @@ export default function AppShell() {
     ]
     return () => unsubs.forEach((u) => u())
   }, [saveAll])
+
+  // Auto-rename storage objects when a doc's tag fields change.  We diff
+  // prev vs next documents arrays inside a Zustand subscription; for each
+  // doc whose direction/vendor/date/amount changed (or that's brand new
+  // and still on its `pending/` ingest path) we move the storage file.
+  // The first invocation just seeds the cache — load() runs async so we
+  // don't want to trigger N renames on initial hydration.
+  useEffect(() => {
+    const seenSignatures = new Map<string, string>()
+    let hydrated = false
+
+    return useDocumentStore.subscribe((state) => {
+      if (!hydrated) {
+        for (const d of state.documents) seenSignatures.set(d.id, renameSignature(d))
+        hydrated = true
+        return
+      }
+      for (const doc of state.documents) {
+        const prev = seenSignatures.get(doc.id)
+        const next = renameSignature(doc)
+        seenSignatures.set(doc.id, next)
+        const isNew = prev === undefined
+        if (!isNew && prev === next) continue
+        // For new uploads we only rename once they're out of the `pending/`
+        // staging folder logic — otherwise a fresh upload with no extracted
+        // tags yet would race with the extraction pass that fills them.
+        if (isNew && doc.storedPath.startsWith('pending/') && !doc.extractedDate && !doc.extractedVendor) continue
+        renameDocumentStorageIfNeeded(doc)
+          .then((patch) => {
+            if (patch) useDocumentStore.getState().updateDocument(doc.id, patch)
+          })
+          .catch((err) => {
+            // Don't toast — background firing on every edit would be noisy.
+            console.error('storage rename failed:', err)
+          })
+      }
+    })
+  }, [])
 
   // Keyboard shortcuts
   useEffect(() => {

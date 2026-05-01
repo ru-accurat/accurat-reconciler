@@ -90,6 +90,9 @@ export interface DocumentRecord {
   // Populated lazily for PDFs the first time the doc is viewed in the grid.
   // Image documents skip thumbnail generation — the source file is the thumbnail.
   thumbnailPath?: string | null
+  // Previous storedPath values from before each rename. Useful for diagnosing
+  // a missing-document complaint or as a fallback if a stale URL is hit.
+  historicalPaths?: string[]
   extractedText: string
   extractedDate: string | null
   extractedAmount: number | null

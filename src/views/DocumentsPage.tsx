@@ -137,8 +137,12 @@ export default function DocumentsPage() {
     try {
       for (const file of Array.from(files)) {
         const ext = file.name.split('.').pop()?.toLowerCase() || ''
+        // Ingest path — held briefly under unknown-vendor/unknown-date until
+        // extraction completes and the auto-rename subscription moves the
+        // file to its semantic location.  The timestamp guarantees
+        // uniqueness during this window.
         const timestamp = Date.now()
-        const storagePath = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+        const storagePath = `pending/${timestamp}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
 
         // Upload to Supabase Storage
         const { error: uploadError } = await supabase.storage
