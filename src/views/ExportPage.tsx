@@ -1,7 +1,7 @@
 'use client'
 import React, { useState } from 'react'
 import { Download, Loader2, Clock, Archive } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useCategoryStore } from '@/stores/categoryStore'

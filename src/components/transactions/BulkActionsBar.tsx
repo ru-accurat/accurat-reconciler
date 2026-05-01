@@ -5,7 +5,7 @@ import { useTransactionStore } from '@/stores/transactionStore'
 import { useContactStore } from '@/stores/contactStore'
 import { useCategoryStore } from '@/stores/categoryStore'
 import { useUIStore } from '@/stores/uiStore'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 export default function BulkActionsBar() {
   const { selectedTransactionIds, clearSelection } = useUIStore()

@@ -5,7 +5,7 @@ import {
   X, Trash2, ArrowUpDown, LayoutGrid, List,
   ArrowDownCircle, ArrowUpCircle, Search, Upload, Download, Eye, Loader2, Wand2
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useContactStore } from '@/stores/contactStore'

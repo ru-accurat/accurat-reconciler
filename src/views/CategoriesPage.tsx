@@ -5,7 +5,7 @@ import { useCategoryStore } from '@/stores/categoryStore'
 import { useTransactionStore } from '@/stores/transactionStore'
 import Modal from '@/components/ui/Modal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 const PRESET_COLORS = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899',

@@ -5,7 +5,7 @@ import { useRuleStore } from '@/stores/ruleStore'
 import { useContactStore } from '@/stores/contactStore'
 import { useCategoryStore } from '@/stores/categoryStore'
 import { suggestPattern } from '@/lib/categorization'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 
 interface CreateRuleDialogProps {
   isOpen: boolean

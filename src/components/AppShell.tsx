@@ -22,6 +22,7 @@ import DocumentsPage from '@/views/DocumentsPage'
 import ExportPage from '@/views/ExportPage'
 import SettingsPage from '@/views/SettingsPage'
 import ImportCSVDialog from '@/components/transactions/ImportCSVDialog'
+import CommandPalette from '@/components/CommandPalette'
 
 export default function AppShell() {
   const activePage = useUIStore((s) => s.activePage)
@@ -169,6 +170,7 @@ export default function AppShell() {
     <MainLayout>
       {renderPage()}
       <ImportCSVDialog />
+      <CommandPalette />
     </MainLayout>
   )
 }

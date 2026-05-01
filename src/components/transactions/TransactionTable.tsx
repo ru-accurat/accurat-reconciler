@@ -17,6 +17,7 @@ import { updateContactFromEntities } from '@/lib/document-matcher'
 import { supabase } from '@/lib/supabase'
 import Modal from '@/components/ui/Modal'
 import InlineSelect from '@/components/ui/InlineSelect'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 import MonthYearPicker from '@/components/ui/MonthYearPicker'
 import CreateRuleDialog from './CreateRuleDialog'
 
@@ -170,16 +171,7 @@ export default function TransactionTable() {
           <InlineSelect value={txn.status} options={statusOptions}
             onChange={(val) => { if (val) updateTransaction(txn.id, { status: val as Transaction['status'] }) }}
             allowClear={false}
-            renderValue={(opt) => {
-              const styles: Record<string, string> = {
-                reconciled: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-                unreconciled: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-                flagged: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                contract: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
-                tax: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-              }
-              return <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${styles[opt.value] || ''}`}>{opt.label}</span>
-            }} />
+            renderValue={(opt) => <StatusBadge status={opt.value as Transaction['status']} label={opt.label} />} />
         )
       },
       size: 120

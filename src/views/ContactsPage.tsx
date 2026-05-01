@@ -5,7 +5,7 @@ import {
   Search, Plus, Edit2, Trash2, X, Save, Users, Building2, ChevronRight,
   Mail, Phone, MapPin, FileText, Tag, ArrowUpDown
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { Contact } from '@/lib/types'
 import { useContactStore } from '@/stores/contactStore'
 import { useTransactionStore } from '@/stores/transactionStore'

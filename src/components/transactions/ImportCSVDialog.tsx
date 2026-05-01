@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useRef } from 'react'
 import { Upload, X, CheckCircle, AlertCircle, FileSpreadsheet } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useTransactionStore } from '@/stores/transactionStore'
 import { useRuleStore } from '@/stores/ruleStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -86,7 +86,7 @@ export default function ImportCSVDialog() {
       if (result.newCount > 0) {
         toast.success(`Imported ${result.newCount} new transaction${result.newCount !== 1 ? 's' : ''}`)
       } else {
-        toast(`No new transactions found (${result.skippedCount} duplicates skipped)`, { icon: 'i' })
+        toast.info(`No new transactions found (${result.skippedCount} duplicates skipped)`)
       }
     } catch (err) {
       setState({

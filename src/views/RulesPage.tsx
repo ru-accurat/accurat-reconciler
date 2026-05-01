@@ -5,7 +5,7 @@ import {
   Search, Plus, Edit2, Trash2, X, Save, Zap, Play, AlertCircle,
   CheckCircle2, ToggleLeft, ToggleRight, ArrowUpDown, Copy, Hash
 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { CategorizationRule } from '@/lib/types'
 import { useRuleStore } from '@/stores/ruleStore'
 import { useContactStore } from '@/stores/contactStore'

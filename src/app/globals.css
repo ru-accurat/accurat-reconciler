@@ -40,6 +40,14 @@
   @apply w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-shadow;
 }
 
+/* Text helpers — WCAG AA compliant on white/dark surfaces.
+ * Use .text-muted for descriptive/helper text instead of raw text-gray-500.
+ *  - light bg: gray-600 → 7.5:1 contrast (AA Large + AA Normal)
+ *  - dark bg:  gray-400 → 7.5:1 contrast (AA Large + AA Normal)
+ */
+.text-muted   { @apply text-gray-600 dark:text-gray-400; }
+.text-subtle  { @apply text-gray-500 dark:text-gray-500; } /* explicit secondary */
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
