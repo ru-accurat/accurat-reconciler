@@ -236,11 +236,18 @@ export default function DocumentsPage() {
           const currentContacts = useContactStore.getState().contacts
           const currentAliases = useVendorAliasStore.getState().aliases
           const currentTemplates = useInvoiceTemplateStore.getState().templates
+          // Transactions already claimed by other docs are excluded so we don't
+          // produce ambiguous matches for vendors with multiple same-amount
+          // payments (e.g. monthly $600 invoices).
+          const claimedTxnIds = new Set<string>(
+            currentDocs.flatMap(d => d.matchedTransactionIds ?? [])
+          )
           let autoMatched = 0
           for (const doc of currentDocs.filter(d => d.matchedTransactionIds.length === 0)) {
-            const candidates = matchDocument(doc, currentTxns, currentContacts, currentAliases, currentTemplates)
+            const candidates = matchDocument(doc, currentTxns, currentContacts, currentAliases, currentTemplates, claimedTxnIds)
             if (isAutoMatch(candidates)) {
               const best = candidates[0]
+              claimedTxnIds.add(best.transactionId)  // claim for subsequent iterations
               useDocumentStore.getState().updateDocument(doc.id, {
                 matchedTransactionIds: [best.transactionId],
                 matchConfidence: best.score,
@@ -290,11 +297,17 @@ export default function DocumentsPage() {
       toast('No unmatched documents to process')
       return
     }
+    // Build the claimed-transaction set up-front and grow it as we match,
+    // so the second pass through the loop excludes whatever the first pass
+    // claimed. Without this, two unmatched docs with the same amount would
+    // both consider the same transaction a candidate.
+    const claimedTxnIds = new Set<string>(documents.flatMap(d => d.matchedTransactionIds ?? []))
     let matched = 0
     for (const doc of unmatchedDocs) {
-      const candidates = matchDocument(doc, transactions, contacts, vendorAliases, templates)
+      const candidates = matchDocument(doc, transactions, contacts, vendorAliases, templates, claimedTxnIds)
       if (isAutoMatch(candidates)) {
         const best = candidates[0]
+        claimedTxnIds.add(best.transactionId)
         updateDocument(doc.id, {
           matchedTransactionIds: [best.transactionId],
           matchConfidence: best.score,

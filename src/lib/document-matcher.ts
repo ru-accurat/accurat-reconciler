@@ -34,7 +34,14 @@ export function matchDocument(
   transactions: Transaction[],
   contacts: Contact[],
   vendorAliases?: VendorAlias[],
-  templates?: InvoiceTemplate[]
+  templates?: InvoiceTemplate[],
+  // Transactions already matched to *other* documents are excluded from
+  // candidate consideration. This is the key disambiguator for vendors with
+  // many same-amount payments (e.g. monthly $600 desk-rental invoices): once
+  // 4 of 5 monthly Nakworks transactions are claimed, the 5th is the only
+  // remaining candidate for a new Nakworks invoice — turning an ambiguous
+  // 5-way tie into a clean 1-way match.
+  excludeTxnIds?: Set<string>
 ): MatchCandidate[] {
   // Build a contact map
   const contactMap = new Map<string, Contact>()
@@ -61,6 +68,7 @@ export function matchDocument(
   const candidates: MatchCandidate[] = []
 
   for (const txn of transactions) {
+    if (excludeTxnIds?.has(txn.id)) continue
     const amountScore = calculateAmountScore(doc.extractedAmount, txn.amount)
     const vendorSimilarity = calculateVendorSimilarity(doc.extractedVendor, txn, contactMap, aliasContactId, entityNames)
     const dateResult = calculateDateProximity(doc.extractedDate, txn.date)
