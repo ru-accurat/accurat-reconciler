@@ -71,6 +71,7 @@ export default function TransactionFilters() {
               <option value="reconciled">Reconciled</option>
               <option value="flagged">Flagged</option>
               <option value="contract">Contract</option>
+              <option value="tax">Tax</option>
             </select>
           </div>
           <div>
