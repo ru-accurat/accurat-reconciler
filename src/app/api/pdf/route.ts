@@ -512,7 +512,11 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer())
     const data = await pdf(buffer)
-    const text = data.text
+    // pdf-parse occasionally emits NUL bytes for PDFs with embedded fonts or
+    // binary content. Postgres JSONB rejects  , so save() would throw
+    // silently inside the auto-save debounce — uploads would appear in the UI
+    // and then vanish on the next page load. Strip at the boundary.
+    const text = (data.text ?? '').replace(/ /g, '')
 
     const customLabels = customLabelsStr ? JSON.parse(customLabelsStr) : []
     const customDateLabels = customDateLabelsStr ? JSON.parse(customDateLabelsStr) : []
