@@ -1,10 +1,10 @@
 'use client'
 import React from 'react'
-import { Search, Upload, Command } from 'lucide-react'
+import { Search, Command } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
 
 export default function Header() {
-  const { filters, setFilters, setShowImportDialog } = useUIStore()
+  const { filters, setFilters } = useUIStore()
   const activePage = useUIStore((s) => s.activePage)
 
   const searchPlaceholder = (() => {
@@ -39,12 +39,6 @@ export default function Header() {
         >
           <Command size={9} /> K
         </kbd>
-      </div>
-      <div className="flex items-center gap-2 ml-auto">
-        <button onClick={() => setShowImportDialog(true)} className="btn-primary btn-sm flex items-center gap-2">
-          <Upload size={14} />
-          Import CSV
-        </button>
       </div>
     </header>
   )

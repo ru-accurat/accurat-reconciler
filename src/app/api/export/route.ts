@@ -10,12 +10,15 @@ import type {
   Category,
 } from '@/lib/types'
 
-// Stream a zip with a multi-sheet xlsx + organized PDF folder bundle.
-// Filters can be passed via querystring:
+// Supports three export modes via ?type=:
+//   type=zip  (default) — Excel workbook + organized PDFs in one .zip
+//   type=xlsx           — Excel workbook only (.xlsx)
+//   type=csv            — Transactions as plain CSV (.csv)
+//
+// Common filter params:
 //   ?from=2026-01-01&to=2026-04-30
-//   ?status=reconciled,unreconciled (CSV)
-//   ?categoryIds=cat-024,cat-016    (CSV)
-// Response is content-type application/zip.
+//   ?status=reconciled,unreconciled  (CSV list)
+//   ?categoryIds=cat-024,cat-016     (CSV list)
 
 export const runtime = 'nodejs'
 
@@ -25,15 +28,27 @@ export async function GET(req: Request) {
   if (!url || !key) return NextResponse.json({ error: 'Supabase env not set' }, { status: 500 })
   const supabase = createClient(url, key)
 
-  // Read from the relational tables (Phase 4 schema).
-  const [{ data: txnRows }, { data: docRows }, { data: contactRows }, { data: catRows }, { data: junction }] =
+  const search = new URL(req.url).searchParams
+  const exportType = (search.get('type') ?? 'zip') as 'zip' | 'xlsx' | 'csv'
+  const from = search.get('from') ?? null
+  const to   = search.get('to')   ?? null
+  const statusFilter = csvSet(search.get('status'))
+  const catFilter    = csvSet(search.get('categoryIds'))
+  const datestamp = new Date().toISOString().slice(0, 10)
+  const monthstamp = new Date().toISOString().slice(0, 7)
+
+  // --- Fetch data ---
+  const needDocs = exportType === 'zip' || exportType === 'xlsx'
+  const [{ data: txnRows }, docResult, { data: contactRows }, { data: catRows }, junctionResult] =
     await Promise.all([
       supabase.from('transactions').select('*'),
-      supabase.from('documents').select('*'),
+      needDocs ? supabase.from('documents').select('*') : Promise.resolve({ data: [] }),
       supabase.from('contacts').select('*'),
       supabase.from('categories').select('*'),
-      supabase.from('document_transactions').select('document_id, transaction_id'),
+      needDocs ? supabase.from('document_transactions').select('document_id, transaction_id') : Promise.resolve({ data: [] }),
     ])
+  const { data: docRows } = docResult as { data: any[] }
+  const { data: junction } = junctionResult as { data: any[] }
 
   const txnsByDoc = new Map<string, string[]>()
   for (const j of junction ?? []) {
@@ -84,12 +99,7 @@ export async function GET(req: Request) {
     id: r.id, name: r.name, color: r.color, parentId: r.parent_id ?? null, isDefault: !!r.is_default,
   }))
 
-  const search = new URL(req.url).searchParams
-  const from = search.get('from') ?? null
-  const to   = search.get('to')   ?? null
-  const statusFilter = csvSet(search.get('status'))
-  const catFilter    = csvSet(search.get('categoryIds'))
-
+  // --- Apply filters ---
   const transactions = allTxns.filter(t => {
     if (from && t.date < from) return false
     if (to && t.date > to) return false
@@ -98,19 +108,72 @@ export async function GET(req: Request) {
     return true
   })
 
-  // Documents: keep those whose extracted date is in range OR that are
-  // matched to one of the surviving transactions.
   const txnIds = new Set(transactions.map(t => t.id))
   const documents = allDocs.filter(d => {
     if ((d.matchedTransactionIds ?? []).some(id => txnIds.has(id))) return true
     if (from && (d.extractedDate ?? '') < from) return false
     if (to && (d.extractedDate ?? '9999') > to) return false
-    return !statusFilter && !catFilter // when filters are off, include unmatched docs
+    return !statusFilter && !catFilter
   })
 
   const generatedAt = new Date().toISOString()
-  const datestamp = generatedAt.slice(0, 10)
-  const monthstamp = generatedAt.slice(0, 7)
+
+  // --- CSV export ---
+  if (exportType === 'csv') {
+    const catById = new Map(categories.map(c => [c.id, c]))
+    const contactById = new Map(contacts.map(c => [c.id, c]))
+    const lines: string[] = [
+      [
+        'Date', 'Description', 'Amount', 'Type', 'Status',
+        'Contact', 'Category', 'Notes', 'Billing Period', 'Imported At',
+      ].map(csvEscape).join(',')
+    ]
+    for (const t of transactions) {
+      const contact  = t.contactId  ? (contactById.get(t.contactId)?.name  ?? '') : ''
+      const category = t.categoryId ? (catById.get(t.categoryId)?.name ?? '') : ''
+      const billing  = t.billingPeriod
+        ? `${t.billingPeriod.year}-${String(t.billingPeriod.month).padStart(2, '0')}`
+        : ''
+      lines.push([
+        t.date,
+        t.rawDescription,
+        t.amount.toFixed(2),
+        t.type,
+        t.status,
+        contact,
+        category,
+        t.notes ?? '',
+        billing,
+        t.importedAt ?? '',
+      ].map(csvEscape).join(','))
+    }
+    const csv = lines.join('\r\n')
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="transactions-${datestamp}.csv"`,
+        'Cache-Control': 'no-store',
+      },
+    })
+  }
+
+  // --- XLSX export ---
+  if (exportType === 'xlsx') {
+    const workbookBuffer = await buildWorkbookBuffer({
+      transactions, documents, contacts, categories, generatedAt,
+    })
+    return new Response(new Uint8Array(workbookBuffer), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="Reconciliation_${monthstamp}.xlsx"`,
+        'Cache-Control': 'no-store',
+      },
+    })
+  }
+
+  // --- ZIP export (default) ---
   const workbookFilename = `Reconciliation_${monthstamp}.xlsx`
   const zipFilename = `reconciler-export-${datestamp}.zip`
 
@@ -123,7 +186,6 @@ export async function GET(req: Request) {
     workbookBuffer, workbookFilename, supabase,
   })
 
-  // Adapt Node Readable → Web ReadableStream for the Response body.
   const webStream = Readable.toWeb(stream) as ReadableStream<Uint8Array>
 
   return new Response(webStream, {
@@ -140,4 +202,12 @@ function csvSet(v: string | null): Set<string> | null {
   if (!v) return null
   const parts = v.split(',').map(s => s.trim()).filter(Boolean)
   return parts.length === 0 ? null : new Set(parts)
+}
+
+function csvEscape(v: string | number | undefined | null): string {
+  const s = String(v ?? '')
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
 }
